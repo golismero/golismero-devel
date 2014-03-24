@@ -2,14 +2,10 @@
 # -*- coding: utf-8 -*-
 
 __license__ = """
-GoLismero 2.0 - The web knife - Copyright (C) 2011-2013
-
-Authors:
-  Daniel Garcia Garcia a.k.a cr0hn | cr0hn<@>cr0hn.com
-  Mario Vilas | mvilas<@>gmail.com
+GoLismero 2.0 - The web knife - Copyright (C) 2011-2014
 
 Golismero project site: https://github.com/golismero
-Golismero project mail: golismero.project<@>gmail.com
+Golismero project mail: contact@golismero-project.com
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -45,10 +41,9 @@ __all__ = [
 # Metadata
 
 __author__     = "GoLismero project team"
-__copyright__  = "Copyright 2011-2013 - GoLismero Project"
-__credits__    = ["Daniel Garcia Garcia a.k.a cr0hn (@ggdaniel)",
-                  "Mario Vilas (@Mario_Vilas)"]
-__email__      = "golismero.project<@>gmail.com"
+__copyright__  = "Copyright (C) 2011-2014 GoLismero Project"
+__credits__    = ["GoLismero Project Team"]
+__email__      = "contact@golismero-project.com"
 __version__    = "2.0.0b5"
 
 
@@ -60,12 +55,10 @@ def get_banner():
     """
     banner_lines = [
         "GoLismero %s, The Web Knife - RootedCON Edition" % __version__,
-        ##__copyright__,
-        "Contact: " + __email__,
+        __copyright__,
         "",
+        "Contact: " + __email__,
     ]
-    for ppl in __credits__:
-        banner_lines.append(ppl)
     width = max(len(line) for line in banner_lines)
     banner = "\n/-" + ("-" * width) + "-\\\n"
     for line in banner_lines:

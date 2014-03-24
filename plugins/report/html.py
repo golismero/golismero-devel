@@ -2,14 +2,10 @@
 # -*- coding: utf-8 -*-
 
 __license__ = """
-GoLismero 2.0 - The web knife - Copyright (C) 2011-2013
-
-Authors:
-  Daniel Garcia Garcia a.k.a cr0hn | cr0hn<@>cr0hn.com
-  Mario Vilas | mvilas<@>gmail.com
+GoLismero 2.0 - The web knife - Copyright (C) 2011-2014
 
 Golismero project site: https://github.com/golismero
-Golismero project mail: golismero.project<@>gmail.com
+Golismero project mail: contact@golismero-project.com
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -69,6 +65,9 @@ class HTMLReport(json.JSONOutput):
 
     #--------------------------------------------------------------------------
     def generate_report(self, output_file):
+
+        Logger.log_verbose(
+            "Writing HTML report to file: %s" % output_file)
 
         Logger.log_more_verbose("Generating JSON database...")
 

@@ -2,14 +2,10 @@
 # -*- coding: utf-8 -*-
 
 __license__ = """
-GoLismero 2.0 - The web knife - Copyright (C) 2011-2013
-
-Authors:
-  Daniel Garcia Garcia a.k.a cr0hn | cr0hn<@>cr0hn.com
-  Mario Vilas | mvilas<@>gmail.com
+GoLismero 2.0 - The web knife - Copyright (C) 2011-2014
 
 Golismero project site: https://github.com/golismero
-Golismero project mail: golismero.project<@>gmail.com
+Golismero project mail: contact@golismero-project.com
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -52,11 +48,14 @@ from golismero.api.config import Config
 from golismero.api.data.db import Database
 from golismero.api.data.resource.ip import IP
 from golismero.api.data.resource.domain import Domain
-from golismero.api.net.scraper import extract_from_text
+from golismero.api.net.web_utils import parse_url
 from golismero.api.plugin import TestingPlugin, ImportPlugin
-from golismero.api.data.vulnerability import UncategorizedVulnerability, Vulnerability
-from golismero.api.data.vulnerability.infrastructure.outdated_platform import *  # noqa
-from golismero.api.data.vulnerability.infrastructure.outdated_software import *  # noqa
+
+from golismero.api.data.vulnerability import UncategorizedVulnerability, Vulnerability  #noqa
+from golismero.api.data.vulnerability.infrastructure.outdated_platform import * # noqa
+from golismero.api.data.vulnerability.infrastructure.outdated_software import * # noqa
+from golismero.api.data.vulnerability.information_disclosure.insecure_method import * # noqa
+from golismero.api.data.vulnerability.malware import * # noqa
 
 
 #------------------------------------------------------------------------------
@@ -294,15 +293,14 @@ class OpenVASPlugin(TestingPlugin):
         # Remember the hosts we've seen so we don't create them twice.
         hosts_seen = {}
 
-        # Map of OpenVAS levels to GoLismero levels.
-        openvas_level_2_golismero = {
+        # Maps of OpenVAS levels to GoLismero levels.
+        LEVELS = {
             'debug': 'informational',
             'log': 'informational',
             'low': "low",
             'medium': 'middle',
             'high': "high",
         }
-
         RISKS = {
             'none': 0,
             'debug': 0,
@@ -319,21 +317,37 @@ class OpenVASPlugin(TestingPlugin):
                 "OpenVAS plugin not initialized, please run setup.py")
             return
 
-        # Load database
-        use_openvas_db = Pickler.load(open(openvas_db, "rb"))
+        # Load the database.
+        with open(openvas_db, "rb") as f:
+            use_openvas_db = Pickler.load(f)
+
+        # Get the configuration.
+        import_log = Config.audit_config.boolean(
+            Config.plugin_args.get("import_log", "no"))
+        import_debug = Config.audit_config.boolean(
+            Config.plugin_args.get("import_debug", "no"))
 
         # For each OpenVAS result...
         for opv in openvas_results:
             try:
+
                 # Get the host.
                 host = opv.host
 
+                # Skip if we don't have a target host.
                 if host is None:
                     continue
 
-                #
+                # Get the threat level.
+                threat = getattr(opv, "threat", "log").lower()
+
+                # Discard log and debug entries, keep only the vulnerabilities.
+                if threat == "log" and not import_log:
+                    continue
+                if threat == "debug" and not import_debug:
+                    continue
+
                 # Get or create the vulnerable resource.
-                #
                 target = ip
                 if host in hosts_seen:
                     target = hosts_seen[host]
@@ -354,62 +368,87 @@ class OpenVASPlugin(TestingPlugin):
                         if not description:
                             description = None
 
-                #
-                # Common data
-                #
-                oid = int(opv.nvt.oid.split(".")[-1])
-                nvt = opv.nvt
-                cve = nvt.cve.split(", ") if nvt.cve else []
-                risk = RISKS.get(nvt.risk_factor.lower(), 0)
-                name = getattr(nvt, "name", "")
-                level = getattr(opv, "threat", "informational").lower()
-                cvss_base = getattr(nvt, "cvss_base", 0.0)
-                references = extract_from_text(description)  # Get the reference URLs.
+                # Extract the relevant information from the results.
+                nvt       = opv.nvt
+                vid       = opv.id
+                oid       = int(nvt.oid.split(".")[-1])
+                name      = getattr(nvt, "name", None)
+                cvss_base = getattr(nvt, "cvss_base", None)
+                level     = LEVELS.get(threat, "informational")
+                risk      = RISKS.get(
+                    getattr(opv.nvt, "risk_factor", "none").lower(), 0)
 
-                # Notes in vuln?
+                # Extract the CVEs and Bugtraq IDs.
+                cve = nvt.cve.split(", ") if nvt.cve else []
+                if "NOCVE" in cve:
+                    cve.remove("NOCVE")
+                bid = []
+                if nvt.bid:
+                    bid.extend("BID-" + x for x in nvt.bid.split(", "))
+                if nvt.bugtraq:
+                    bid.extend("BID-" + x for x in nvt.bugtraq.split(", "))
+                if "NOBID" in bid:
+                    cve.remove("NOBID")
+
+                # Extract the notes and add them to the description text.
                 if opv.notes:
                     description += "\n" + "\n".join(
                         " - " + note.text
                         for note in opv.notes
                     )
 
-                #
+                # Extract the reference URLs from the description text.
+                references = []
+                p = description.find("URL:")
+                while p >= 0:
+                    p += 4
+                    q2 = description.find("\n", p)
+                    q1 = description.find(",", p, q2)
+                    if q1 > p:
+                        q = q1
+                    else:
+                        q = q2
+                    if q < p:
+                        q = len(description)
+                    url = description[p:q].strip()
+                    try:
+                        url = parse_url(url).url
+                        references.append(url)
+                    except Exception:
+                        Logger.log_error(format_exc())
+                        pass
+                    p = description.find("URL:", q)
+
                 # Prepare the vulnerability properties.
-                #
                 kwargs = {
-                    "level": openvas_level_2_golismero[level.lower()],
-                    "description": description,
-                    "references": references,
-                    "cve": cve,
-                    "risk": risk,
-                    "severity": risk,
-                    "impact": risk,
-                    "cvss_base": cvss_base,
-                    "title": name,
-                    "tool_id": "openvas_plugin_%s" % str(oid)
+                    "title":        name,
+                    "description":  description,
+                    "references":   references,
+                    "level":        level,
+                    "risk":         risk,
+                    "severity":     risk,
+                    "impact":       risk,
+                    "cvss_base":    cvss_base,
+                    "cve":          cve,
+                    "bid":          bid,
+                    "tool_id":      "openvas_plugin_%s" % oid,
+                    "custom_id":    vid,
                 }
 
                 # If we have the OpenVAS plugin database, look up the plugin ID
                 # that reported this vulnerability and create the vulnerability
                 # using a specific class. Otherwise use the vulnerability class
                 # for uncategorized vulnerabilities.
-                candidate_classes = ["UncategorizedVulnerability"]
-
-                # Looking for plugin ID in database
+                classname = "UncategorizedVulnerability"
                 if oid in use_openvas_db:
-                    candidate_classes = use_openvas_db[oid][0]
+                    classname = use_openvas_db[oid][0][0]
 
-                # Make vulnerabilities
-                for c in candidate_classes:
-                    clazz = globals()[c]
+                # Create the Vulnerability object.
+                clazz = globals()[classname]
+                vuln  = clazz(target, **kwargs)
+                results.append(vuln)
 
-                    # Create the vuln
-                    vuln = clazz(target, **kwargs)
-
-                    # Add the vulnerability.
-                    results.append(vuln)
-
-            # Skip on error.
+            # Skip this result on error.
             except Exception, e:
                 t = format_exc()
                 Logger.log_error_verbose(
