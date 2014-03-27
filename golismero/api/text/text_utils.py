@@ -46,6 +46,8 @@ def char_count(text):
 
     :returns: Number of printable characters in text.
     :rtype: int
+
+    :raises: TypeError
     """
     return sum(1 for _ in finditer(r"\w", text))
 
@@ -58,7 +60,12 @@ def line_count(text):
 
     :returns: Number of lines in text.
     :rtype: int
+
+    :raises: TypeError
     """
+    if not isinstance(text, basestring):
+        raise TypeError("Expected basestring, got '%s' instead" % type(text))
+
     count = text.count("\n")
     if not text.endswith("\n"):
         count += 1
@@ -73,6 +80,8 @@ def word_count(text):
 
     :returns: Number of words in text.
     :rtype: int
+
+    :raises: TypeError
     """
     return sum(1 for _ in finditer(r"\w+", text))
 
@@ -95,6 +104,8 @@ def generate_random_string(length = 30):
 
     :param length: Desired string length.
     :type length: int
+
+    :raises: TypeError
     """
 
     m_available_chars = ascii_letters + digits
@@ -142,8 +153,13 @@ def uncamelcase(string):
 
     :returns: Human-readable string.
     :rtype: str
+
+    :raises: TypeError
     """
-    string = string.replace("_"," ")
+    if not isinstance(string, basestring):
+        raise TypeError("Expected basestring, got '%s' instead" % type(string))
+
+    string = string.replace("_", " ")
     string = __uncamelcase_re.sub(" ", string)
     while "  " in string:
         string = string.replace("  ", " ")
@@ -160,7 +176,12 @@ def hexdump(s):
 
     :returns: Hexadecimal output.
     :rtype: str
+
+    :raises: TypeError
     """
+    if not isinstance(s, basestring):
+        raise TypeError("Expected basestring, got '%s' instead" % type(s))
+
     a = []
     for i in xrange(0, len(s), 16):
         h1 = " ".join("%.2x" % ord(c) for c in s[i:i+8])
