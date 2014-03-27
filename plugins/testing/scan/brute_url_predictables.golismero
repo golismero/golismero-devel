@@ -12,6 +12,9 @@ License     = GNU Public License v2
 Module = brute_url.py
 Class = PredictablesDisclosureBruteforcer
 
+[Arguments]
+server_name =
+
 [common]
 w2 = fuzzdb/Discovery/PredictableRes/Logins.fuzz.txt
 w3 = fuzzdb/Discovery/PredictableRes/Passwords.fuzz.txt
