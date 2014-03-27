@@ -80,53 +80,58 @@ class PredictablesDisclosureBruteforcer(TestingPlugin):
 
         Logger.log_more_verbose("Start to process URL: %r" % m_url)
 
-        #
-        # Get the remote web server fingerprint
-        #
-        m_webserver_finger = info.get_associated_informations_by_category(WebServerFingerprint.information_type)
+        # Server specified by param?
+        webserver_finger = Config.plugin_args.get("server_banner", None)
+        if webserver_finger:
+            server_canonical_name = webserver_finger
+            servers_related = []  # Set with related web servers
+        else:
+            # User fingerprint info
+            webserver_finger = info.get_associated_informations_by_category(WebServerFingerprint.information_type)
+            if webserver_finger:
+                webserver_finger = webserver_finger.pop()
 
-        m_wordlist = set()
+                server_canonical_name = webserver_finger.canonical_name
+                servers_related = webserver_finger.related  # Set with related web servers
+
+
+        wordlist = set()
 
         # Common wordlists
         try:
             w = Config.plugin_extra_config["common"]
-            m_wordlist.update([l_w for l_w in w.itervalues()])
+            wordlist.update([l_w for l_w in w.itervalues()])
         except KeyError:
             Logger.log_error("Can't load common wordlists")
 
         # There is fingerprinting information?
-        if m_webserver_finger:
-
-            m_webserver_finger = m_webserver_finger.pop()
-
-            m_server_canonical_name = m_webserver_finger.canonical_name
-            m_servers_related = m_webserver_finger.related # Set with related web servers
+        if webserver_finger:
 
             #
             # Load wordlists
             #
-            m_wordlist_update = m_wordlist.update
+            wordlist_update = wordlist.update
 
             # Wordlist of server name
             try:
-                w = Config.plugin_extra_config["%s_predictables" % m_server_canonical_name]
-                m_wordlist_update([l_w for l_w in w.itervalues()])
+                w = Config.plugin_extra_config["%s_predictables" % server_canonical_name]
+                wordlist_update([l_w for l_w in w.itervalues()])
             except KeyError:
-                Logger.log_error("Can't load predictables wordlists for server: '%s'." % m_server_canonical_name)
+                Logger.log_error("Can't load predictables wordlists for server: '%s'." % server_canonical_name)
 
             # Wordlist of related with the server found
             try:
-                for l_servers_related in m_servers_related:
+                for l_servers_related in servers_related:
                     w = Config.plugin_extra_config["%s_predictables" % l_servers_related]
-                    m_wordlist_update([l_w for l_w in w.itervalues()])
+                    wordlist_update([l_w for l_w in w.itervalues()])
             except KeyError, e:
                 Logger.log_error("Can't load wordlists predictables wordlists for related webserver: '%s'" % e)
 
         # Load content of wordlists
-        m_urls = set()
-        m_urls_update = m_urls.add
+        urls = set()
+        m_urls_update = urls.add
 
-        for l_w in m_wordlist:
+        for l_w in wordlist:
             # Use a copy of wordlist to avoid modify the original source
             l_loaded_wordlist = WordListLoader.get_advanced_wordlist_as_list(l_w)
 
@@ -140,14 +145,14 @@ class PredictablesDisclosureBruteforcer(TestingPlugin):
 
                 m_urls_update(tmp_u)
 
-        Logger.log_verbose("Loaded %s URLs to test." % len(m_urls))
+        Logger.log_verbose("Loaded %s URLs to test." % len(urls))
 
         # Generates the error page
-        m_error_response = get_error_page(m_url)
+        error_response = get_error_page(m_url)
 
         # Create the matching analyzer
         try:
-            m_store_info = MatchingAnalyzer(m_error_response.raw_data, min_ratio=0.65)
+            store_info = MatchingAnalyzer(error_response.raw_data, min_ratio=0.65)
         except ValueError, e:
             Logger.log_error("There is not information for analyze when creating the matcher: '%s'" % e)
             return
@@ -156,16 +161,16 @@ class PredictablesDisclosureBruteforcer(TestingPlugin):
         _f = partial(process_url,
                      severity_vectors['predictables'],
                      get_http_method(m_url),
-                     m_store_info,
+                     store_info,
                      self.update_status,
-                     len(m_urls))
+                     len(urls))
 
         # Process the URLs
-        for i, l_url in enumerate(m_urls):
+        for i, l_url in enumerate(urls):
             _f((i, l_url))
 
         # Generate and return the results.
-        return generate_results(m_store_info.unique_texts)
+        return generate_results(store_info.unique_texts)
 
 
 #------------------------------------------------------------------------------
@@ -480,7 +485,6 @@ def process_url(risk_level, method, matcher, updater_func, total_urls, url):
     :param url: a tuple with data: (index, the URL to process)
     :type url: tuple(int, str)
     """
-
     i, url = url
 
     updater_func((float(i) * 100.0) / float(total_urls))
