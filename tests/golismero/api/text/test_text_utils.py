@@ -5,7 +5,7 @@ import pytest
 
 from golismero.api.text.text_utils import \
     char_count, line_count, word_count, generate_random_string, \
-    uncamelcase, hexdump, to_utf8, split_first
+    uncamelcase, hexdump, to_utf8
 
 
 #--------------------------------------------------------------------------
@@ -151,7 +151,7 @@ def test_empty_imput():
     assert to_utf8(u"ÑAAA".encode("iso-8859-1")) == "\xd1AAA"
     assert to_utf8(u"ÑAAA".encode("latin1")) == "\xd1AAA"
     assert to_utf8(0) == 0
-    assert to_utf8(None) == None
+    assert to_utf8(None) is None
     assert to_utf8([]) == []
     assert to_utf8(bin(0101)) == '0b1000001'
 
