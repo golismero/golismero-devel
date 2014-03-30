@@ -51,15 +51,28 @@ def get_words(text, min_length = None, max_length = None):
     :param text: Text to parse.
     :type text: str
 
-    :param min_length: Minimum length required. Use None for no limit.
+    :param min_length: Minimum length required by each token. Use None for no limit.
     :type min_length: int | None
 
-    :param min_length: Maximum length allowed. Use None for no limit.
+    :param min_length: Maximum length allowed by each token. Use None for no limit.
     :type min_length: int | None
 
     :return: Set of unique words extracted from the text.
     :rtype: set(str)
+
+    :raises: TypeError, ValueError
     """
+    if min_length is not None:
+        if not isinstance(min_length, int):
+            raise TypeError("Expected int, got '%s' instead" % type(min_length))
+        elif min_length < 0:
+            raise ValueError("Min length must be greater than 0, got %s." % min_length)
+
+    if max_length is not None:
+        if not isinstance(max_length, int):
+            raise TypeError("Expected int, got '%s' instead" % type(min_length))
+        elif max_length < 0:
+            raise ValueError("Min length must be greater than 0, got %s" % max_length)
 
     # Split the text into separate tokens, using natural language
     # punctuation signs. Then filter out by min/max length, and tokens
