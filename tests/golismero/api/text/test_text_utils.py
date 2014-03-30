@@ -5,7 +5,7 @@ import pytest
 
 from golismero.api.text.text_utils import \
     char_count, line_count, word_count, generate_random_string, \
-    uncamelcase, hexdump, to_utf8
+    uncamelcase, hexdump, to_utf8, split_first
 
 
 #--------------------------------------------------------------------------
@@ -144,7 +144,7 @@ class TestHexDump:
 #--------------------------------------------------------------------------
 # To UTF-8 test
 #--------------------------------------------------------------------------
-def test_empty_imput():
+def test_empty_input():
     assert to_utf8(u"ÑAAA".encode("UTF-16")) == "\xff\xfe\xd1\x00A\x00A\x00A\x00"
     assert to_utf8(u"ÑAAA".encode("UTF-8")) == "\xc3\x91AAA"
     assert to_utf8(u"ÑAAA".encode("iso-8859-15")) == "\xd1AAA"
@@ -155,4 +155,33 @@ def test_empty_imput():
     assert to_utf8([]) == []
     assert to_utf8(bin(0101)) == '0b1000001'
 
+
+#--------------------------------------------------------------------------
+# Split_first test
+#--------------------------------------------------------------------------
+class TestSplitFirst:
+
+    #----------------------------------------------------------------------
+    def test_types_param_1(self):
+        pytest.raises(TypeError, split_first, None, None)
+        pytest.raises(TypeError, split_first, 0, None)
+        pytest.raises(TypeError, split_first, [], None)
+        pytest.raises(TypeError, split_first, dict(), None)
+
+    #----------------------------------------------------------------------
+    def test_types_param_2(self):
+        pytest.raises(TypeError, split_first, "", None)
+        pytest.raises(TypeError, split_first, "", None)
+        pytest.raises(TypeError, split_first, "", None)
+        pytest.raises(TypeError, split_first, "", None)
+
+    #----------------------------------------------------------------------
+    def test_empty_imput(self):
+        assert split_first("", "") == ("", "", None)
+
+    #----------------------------------------------------------------------
+    def test_input(self):
+        assert split_first("hello//world", "?/") == ("hello", "/world", "/")
+        assert split_first("hello??/world", "?/") == ("hello", "?/world", "?")
+        assert split_first("hello world", "?/") == ("hello world", "", None)
 
