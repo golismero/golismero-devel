@@ -222,7 +222,7 @@ def to_utf8(s):
 #
 def split_first(s, delims):
     """
-    Given a string and an iterable of delimiters, split on the first found
+    Given a string and an another delimiters as strings, split on the first found
     delimiter. Return the two split parts and the matched delimiter.
 
     If not found, then the first part is the full input string.
@@ -239,6 +239,17 @@ def split_first(s, delims):
 
     .. warning: This function was borrowed from the urllib3 project.
                 It may be removed in future versions of GoLismero.
+        
+    :param s: string to delimit to. 
+    :type s: str
+    
+    :param delims: string with delimits characters 
+    :type delims: str
+    
+    :return: a tuple as format: (FIRST_OCCURRENCE, REST_OF_TEXT, MATCHING_CHAR)
+    :rtype: (str, str, str|None)
+
+    :raises: TypeError
     """
     min_idx = None
     min_delim = None
