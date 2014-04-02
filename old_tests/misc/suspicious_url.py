@@ -73,8 +73,8 @@ class SuspiciousURLPlugin(TestingPlugin):
         # Find suspicious URLs by matching against known substrings.
 
         # Load wordlists
-        m_wordlist_middle     = WordListLoader.get_wordlist(Config.plugin_config['middle'])
-        m_wordlist_extensions = WordListLoader.get_wordlist(Config.plugin_config['extensions'])
+        m_wordlist_middle     = WordListLoader.get_wordlist_as_raw(Config.plugin_config['middle'])
+        m_wordlist_extensions = WordListLoader.get_wordlist_as_raw(Config.plugin_config['extensions'])
 
         # Add matching keywords at any positions of URL.
         m_results.extend([SuspiciousURLPath(info, x)
@@ -122,7 +122,7 @@ class SuspiciousURLPlugin(TestingPlugin):
         # Load the malware wordlist.
         wordlist_filename = Config.plugin_config["malware_sites"]
         try:
-            wordlist = WordListLoader.get_advanced_wordlist_as_list(
+            wordlist = WordListLoader.get_wordlist_as_list(
                 wordlist_filename)
         except WordlistNotFound:
             Logger.log_error("Wordlist '%s' not found.." % wordlist_filename)
@@ -159,7 +159,7 @@ class SuspiciousURLPlugin(TestingPlugin):
             return
 
         # Do not follow URLs that contain certain keywords
-        m_forbidden = WordListLoader.get_wordlist(
+        m_forbidden = WordListLoader.get_wordlist_as_raw(
             Config.plugin_config["wordlist_no_spider"])
         m_urls_allowed = {
             url for url in m_links

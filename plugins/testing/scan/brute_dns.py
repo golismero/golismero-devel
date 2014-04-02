@@ -63,7 +63,7 @@ class DNSBruteforcer(TestingPlugin):
 
         # Load the subdomains wordlist.
         try:
-            wordlist = WordListLoader.get_advanced_wordlist_as_list(Config.plugin_args["wordlist"])
+            wordlist = WordListLoader.get_wordlist_as_list(Config.plugin_args["wordlist"])
         except WordlistNotFound:
             Logger.log_error_verbose("Wordlist '%s' not found.." % Config.plugin_args["wordlist"])
             return
@@ -73,7 +73,7 @@ class DNSBruteforcer(TestingPlugin):
 
         # Load the subdomains whitelist.
         try:
-            whitelist = WordListLoader.get_advanced_wordlist_as_list(Config.plugin_config["wordlist"])
+            whitelist = WordListLoader.get_wordlist_as_list(Config.plugin_config["wordlist"])
         except WordlistNotFound:
             Logger.log_error_verbose("Wordlist '%s' not found.." % Config.plugin_config["wordlist"])
             return
