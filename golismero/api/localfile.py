@@ -181,6 +181,10 @@ class _LocalFile (Singleton):
         :returns: True if the file exists, False otherwise.
         :rtype: bool
         """
+        if filename is None:
+            return False
+        if not filename:
+            return False
 
         # Sanitize the filename.
         filename = self.__sanitize(filename)
