@@ -28,21 +28,22 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 __all__ = ["WordListLoader", "WordlistNotFound"]
 
-from os import walk
-from os.path import join, sep, abspath, exists, isfile
-from golismero.api.text.matching_analyzer import get_diff_ratio
-from golismero.api.localfile import LocalFile
 import bisect
 import re
 import copy
 
-from ..logger import Logger
+from os import walk
+from abc import ABCMeta, abstractproperty
+from golismero.api.localfile import LocalFile
+from os.path import join, sep, abspath, exists, isfile
+
+from .matching_analyzer import get_diff_ratio
 from ...common import Singleton, get_wordlists_folder
 
 
 #------------------------------------------------------------------------------
 class WordlistNotFound(Exception):
-    "Class when wordlist not found"
+    """Exception when wordlist not found"""
 
 
 #------------------------------------------------------------------------------
@@ -51,19 +52,19 @@ class _WordListLoader(Singleton):
     Wordlist API.
     """
 
-
     #--------------------------------------------------------------------------
     def __init__(self):
 
         # Store
-        self.__store = {} # Pair with: (name, path)
+        self.__store = {}  # Pair with: (name, path)
 
         # Initial load
-        self.__load_wordlists( get_wordlists_folder() )
-
+        self.__load_wordlists(get_wordlists_folder())
 
     #--------------------------------------------------------------------------
-    def __resolve_wordlist_name(self, wordlist):
+    # Private methods
+    #--------------------------------------------------------------------------
+    def __get_wordlist_descriptor(self, wordlist):
         """
         Looking for the world list in this order:
         1 - In the internal database and.
@@ -73,70 +74,77 @@ class _WordListLoader(Singleton):
         If Wordlist not found, raise WordlistNotFound exception.
 
         :param wordlist: wordlist name
-        :type wordlist: str
+        :type wordlist: basestring
 
         :return: a file descriptor.
         :rtype: open()
 
         :raises: WordlistNotFound, TypeError, ValueError
         """
-        if not wordlist:
-            raise ValueError("Wordlist name can't be an empty value")
         if not isinstance(wordlist, basestring):
             raise TypeError("Expected 'str' got '%s'." % type(wordlist))
 
-        m_return = None
-
         # For avoid user errors, library accept also, wordlists starting as:
         # wordlist/....
-        if "wordlist" in wordlist:
+        if wordlist.startswith("wordlist"):
             wordlist = "/".join(wordlist.split("/")[1:])
 
+        if not wordlist:
+            raise ValueError("Wordlist name can't be an empty value")
+
         try:
-            m_return = open(self.__store[wordlist], "rU")
-        except KeyError: # Wordlist is not in the internal database
-            # Exits the file
+            return open(self.__store[wordlist], "rU")
+        except KeyError:  # Wordlist is not in the internal database
+
+            # Can open from plugin wordlists?
+            internal = True
             try:
                 if LocalFile.exists(wordlist):
                     if not LocalFile.isfile(wordlist):
-                        raise TypeError("Wordlist '%s' is not a file." % wordlist)
+                        internal = False
 
-                    m_return = LocalFile.open(wordlist, "rU")
+                    return LocalFile.open(wordlist, "rU")
+                else:
+                    internal = False
+            except ValueError:
+                internal = False
 
-            except ValueError: # Wordlist is out of the plugin path
-
+            if not internal:
                 # Looking the wordlist in the file system, assuming that the
-                # worllist name is an absolute path.
+                # wordlist name is an absolute path.
                 if exists(wordlist):
                     if not isfile(wordlist):
-                        raise TypeError("Wordlist '%s' is not a file." % wordlist)
+                        raise WordlistNotFound("Wordlist '%s' is not a file." % wordlist)
 
-                    m_return = open(wordlist, "rU")
-
+                    return open(wordlist, "rU")
                 else:
                     raise WordlistNotFound("Wordlist file '%s' does not exist." % wordlist)
 
-        return m_return
-
-
     #--------------------------------------------------------------------------
-    def __load_wordlists(self, currentDir):
+    def __load_wordlists(self, current_dir):
         """
         Find and load wordlists from the specified directory.
 
         .. warning: Private method, do not call!
 
-        :param currentDir: Directory to look for wordlists.
-        :type currentDir: str
+        :param current_dir: Directory to look for wordlists.
+        :type current_dir: str
+
+        :raises: TypeError, ValueError
         """
+        if not isinstance(current_dir, basestring):
+            raise TypeError("Expected basestring, got '%s' instead" % type(current_dir))
 
         # Make sure the directory name is absolute and ends with a slash.
-        currentDir = abspath(currentDir)
-        if not currentDir.endswith(sep):
-            currentDir += sep
+        current_dir = abspath(current_dir)
+        if not current_dir.endswith(sep):
+            current_dir += sep
+
+        if not exists(current_dir):
+            raise ValueError("Path directory for wordlist '%s' not exits" % current_dir)
 
         # Iterate the directory recursively.
-        for (dirpath, _, filenames) in walk(currentDir):
+        for (dirpath, _, filenames) in walk(current_dir):
 
             # Make sure the directory name is absolute.
             dirpath = abspath(dirpath)
@@ -148,12 +156,14 @@ class _WordListLoader(Singleton):
                     # Map the relative filename to the absolute filename,
                     # replacing \ for / on Windows.
                     target = join(dirpath, fname)
-                    key = target[len(currentDir):]
+                    key = target[len(current_dir):]
                     if sep != "/":
                         key = key.replace(sep, "/")
                     self.__store[key] = target
 
 
+    #--------------------------------------------------------------------------
+    # Property
     #--------------------------------------------------------------------------
     @property
     def all_wordlists(self):
@@ -163,84 +173,143 @@ class _WordListLoader(Singleton):
         """
         return self.__store.keys()
 
-
     #--------------------------------------------------------------------------
-    def get_wordlist(self, wordlist_name):
+    # Public methods
+    #--------------------------------------------------------------------------
+    def get_wordlist_as_raw(self, wordlist_name):
         """
+        Get a wordlist line by line, in raw format.
+
+        >>> values = ["hello", "world", "  this has spaces  ", "# A comment"]
+        >>> open("my_wordlist.txt", "w").writelines(values)
+        >>> w = WordListLoader.get_wordlist_as_raw("my_wordlist.txt")
+        >>> for line in w:
+            print line,
+        hello
+        world
+          this has spaces
+        # A comment
+
+
         :param wordlist_name: Name of the requested wordlist.
-        :type wordlist_name: str
+        :type wordlist_name: basestring
 
         :returns: Iterator for the selected wordlist.
         :rtype: iter(str)
+
+        :raises: TypeError, ValueError, WordlistNotFound
         """
+        if not isinstance(wordlist_name, basestring):
+            raise TypeError("Expected basestring, got '%s' instead" % type(wordlist_name))
+        if not wordlist_name:
+            ValueError("Expected wordlist name, got None instead")
 
-        return SimpleWordList(self.__resolve_wordlist_name(wordlist_name))
+        fixed_wordlist = self.__get_wordlist_descriptor(wordlist_name)
 
+        try:
+            return _simple_iterator(fixed_wordlist)
+        except IOError, e:
+            raise WordlistNotFound("Error opening wordlist. Error: %s " % str(e))
 
     #--------------------------------------------------------------------------
-    def get_advanced_wordlist_as_dict(self, wordlist, separator=";", smart_load=False):
+    def get_wordlist_as_dict(self, wordlist_name, separator=";", smart_load=False):
         """
-        Get an AdvancedDicWordlist.
+        Get a wordlist as a dict, with some search operations.
+
+        Load a wordlist file, with their lines splited by some char, an load left str as a key, and right as a value.
+
+        >>> values = ["hello", "world", "  this has spaces  ", "# A comment"]
+        >>> open("my_wordlist.txt", "w").writelines(values)
+        >>> w = WordListLoader.get_wordlist_as_l("my_wordlist.txt")
+        >>> for line in w:
+            print line,
+        hello
+        world
+        this has spaces
+        A comment
+        >>>
 
 
-        :param wordlist_name: Name of the requested advanced wordlist.
+        :param wordlist_name: Wordlist name.
         :type wordlist_name: str
 
         :param separator: value used to split the lines
         :type separator: str
 
-        :param inteligence_load: Indicates if the wordlist must detect if the line has values that can be converted in a list.
-        :type inteligence_load: bool
+        :param smart_load: Indicates if the wordlist must detect if the line has values that can be converted in a list.
+        :type smart_load: bool
 
         :returns: Advanced wordlist object.
-        :rtype: AdvancedDicWordlist
+        :rtype: WDict
         """
 
-        return AdvancedDicWordlist(self.__resolve_wordlist_name(wordlist), smart_load, separator)
-
+        return WDict(self.__get_wordlist_descriptor(wordlist_name), smart_load, separator)
 
     #--------------------------------------------------------------------------
-    def get_advanced_wordlist_as_list(self, wordlist_name):
+    def get_wordlist_as_list(self, wordlist_name):
         """
-        Get an AdvancedListWordlist.
+        Get a wordlist as a list, with some search operations.
 
-        :param wordlist_name: Name of the requested advanced wordlist.
+        Also apply these filter to each line:
+        - Filter commented lines (starting with '#')
+        - Remove end chars: line return '\n', tabs '\t' or carry line.
+        - Remove start and end spaces.
+
+        >>> values = ["hello", "world", "  this has spaces  ", "# A comment", "word"]
+        >>> open("my_wordlist.txt", "w").writelines(values)
+        >>> w = WordListLoader.get_wordlist_as_list("my_wordlist.txt")
+        >>> for line in w:
+            print line,
+        hello
+        world
+        this has spaces
+        A comment
+        >>> w.se
+
+        :param wordlist_name: Wordlist name.
         :type wordlist_name: str
 
-        :returns: AdvancedListWordlist.
-        :rtype: AdvancedListWordlist
+        :returns: WList.
+        :rtype: WList
         """
 
-        return AdvancedListWordlist(self.__resolve_wordlist_name(wordlist_name))
+        return WList(self.__get_wordlist_descriptor(wordlist_name))
 
 
-#------------------------------------------------------------------------------
-def SimpleWordList(wordlist):
+#----------------------------------------------------------------------
+def _simple_iterator(wordlist_handler):
     """
-    Load a wordlist from a file and iterate its words.
+    Simple iterator function.
 
-    :param wordlist: a file descriptor of the wordlist.
-    :type wordllist: open()
+    ..note:
+
+    This function is outside of get_wordlist_as_raw because generators functions can't raise common
+    exceptions os return values for wrong inputs.
+
+    :param wordlist_handler: path to wordlist
+    :type wordlist_handler: str
+
+    :raises: WordlistNotFound
     """
+    if not isinstance(wordlist_handler, file):
+        raise TypeError("Expected file, got '%s' instead" % type(wordlist_handler))
 
     try:
-        for line in wordlist:
-            line = line.strip()
-            if line and not line.startswith("#"):
-                yield line
-
+        for line in wordlist_handler:
+            yield line
     except IOError, e:
-        Logger.log_error("Error opening wordlist. Error: %s " % str(e))
+        raise WordlistNotFound("Error opening wordlist. Error: %s " % str(e))
 
 
 #------------------------------------------------------------------------------
-class AbstractWordlist(object):
+class _AbstractWordlist(object):
     """
-    Base class for advanced wordlists.
+    Abstract class for advanced wordlists.
     """
-
+    __metaclass__ = ABCMeta
 
     #--------------------------------------------------------------------------
+    @abstractproperty
     def binary_search(self, word, low_pos=0, high_pos=None):
         """
         Makes a binary search in the list and return the position of the word.
@@ -263,27 +332,26 @@ class AbstractWordlist(object):
 
         :raises: ValueError
         """
-        raise NotImplementedError()
-
 
     #--------------------------------------------------------------------------
+    @abstractproperty
     def get_first(self, word, init=0):
         """
-        Get first coincidence, starting at begining. Raises a ValueError exception
-        if no coincidence found.
+        Get the index of first coincidence or 'word', starting at init value.
 
-        :param init: initial postion to the function starts searching.
+        Raises a ValueError exception if no coincidence found.
+
+        :param init: initial position to the function starts searching.
         :type init: Int
 
-        :return: Value of the first element found.
-        :rtype: str
+        :return: index of the first element found.
+        :rtype: int
 
         :raises: ValueError
         """
-        raise NotImplementedError()
-
 
     #--------------------------------------------------------------------------
+    @abstractproperty
     def get_rfirst(self, word, init=0):
         """
         Get first coincidence, starting from the end. Raises a ValueError exception
@@ -297,34 +365,71 @@ class AbstractWordlist(object):
 
         :raises: ValueError
         """
-        raise NotImplementedError()
-
 
     #--------------------------------------------------------------------------
+    @abstractproperty
     def search_mutations(self, word, rules):
-        raise NotImplementedError()
-
+        """"""
 
     #--------------------------------------------------------------------------
+    @abstractproperty
     def clone(self):
         """
         This method makes a clone of the object.
 
         :return: A copy of this object.
         """
-        raise NotImplementedError()
+
+    #----------------------------------------------------------------------
+    def _raw_to_list(self, input_iterable):
+        """
+        Transform iterable input text into a list, without line breaks or any other special character.
+
+        :param input_iterable: Input iterable info.
+        :type input_iterable: file
+
+        :return: generated list.
+        :rtype: list(str)
+
+        :raises: ValueError, TypeError
+        """
+        if input_iterable is None:
+            raise TypeError("None is not iterable")
+        if not hasattr(input_iterable, "__iter__"):
+            raise TypeError("Object not iterable")
+
+        results = []
+        results_append = results.append
+        for i in input_iterable:
+            if not isinstance(i, basestring):
+                try:
+                    # Only numbres
+                    float(i)
+                    i = str(i)
+                except TypeError:
+                    try:
+                        int(i)
+                        i = str(i)
+                    except TypeError:
+                        continue
+
+            # Remove line breaks and special chars
+            v = i.replace("\n", "").replace("\t", "").replace("\r", "").strip()
+            results_append(v)
+
+        return results
 
 
 #------------------------------------------------------------------------------
-class AdvancedListWordlist(AbstractWordlist):
+class WList(_AbstractWordlist):
     """
     Advanced wordlist that loads a wordlist as a list. This wordlist behaves
-    as a list.
+    as a list, removing break lines and carry returns.
 
     Example:
 
-        >>> from golismero.api.text.wordlist import AdvancedListWordlist
-        >>> a = AdvancedListWordlist("./wordlist/golismero/no_spiderable_urls.txt")
+        >>> from golismero.api.text.wordlist import WList
+        >>> a = WList("./wordlist/golismero/no_spiderable_urls.txt")
         >>> "exit" in a
         True
         >>> for p in a:
@@ -345,48 +450,47 @@ class AdvancedListWordlist(AbstractWordlist):
     - Search matches of wordlist with mutations.
     """
 
+    #--------------------------------------------------------------------------
+    def search_mutations(self, word, rules):
+        pass
 
     #--------------------------------------------------------------------------
     def __init__(self, wordlist):
         """
         :param wordlist: a file descriptor of the wordlist.
-        :type wordllist: open()
+        :type wordlist: open()
         """
 
         if not wordlist:
             raise ValueError("Got empty wordlist")
 
         try:
-            self.__wordlist = list( SimpleWordList(wordlist) )
+            self.__wordlist = list(simple_word_list(wordlist))
         except IOError, e:
             raise IOError("Error when trying to open wordlist: %s" + str(e))
-
 
     #--------------------------------------------------------------------------
     def __getitem__(self, i):
         return self.__wordlist[i]
 
-
     #--------------------------------------------------------------------------
     def __setitem__(self, i, v):
         self.__wordlist[i] = v
-
 
     #--------------------------------------------------------------------------
     def __contains__(self, i):
         return i in self.__wordlist
 
-
     #--------------------------------------------------------------------------
     def __iter__(self):
         return self.__wordlist.__iter__()
-
 
     #--------------------------------------------------------------------------
     def __len__(self):
         return len(self.__wordlist)
 
-
+    #--------------------------------------------------------------------------
+    # Operations
     #--------------------------------------------------------------------------
     def binary_search(self, word, low_pos=0, high_pos=None):
         i = bisect.bisect_left(self.__wordlist, word, lo=low_pos, hi=high_pos if high_pos else len(high_pos))
@@ -396,12 +500,8 @@ class AdvancedListWordlist(AbstractWordlist):
 
         raise ValueError()
 
-
     #--------------------------------------------------------------------------
     def get_first(self, word, init=0):
-        """
-        Get first coincidence, starting at begining.
-        """
         i = bisect.bisect_left(self.__wordlist, word, lo=init)
 
         if i:
@@ -409,19 +509,14 @@ class AdvancedListWordlist(AbstractWordlist):
 
         raise ValueError()
 
-
     #--------------------------------------------------------------------------
     def get_rfirst(self, word, init=0):
-        """
-        Get first coincidence, starting at begining.
-        """
         i = bisect.bisect_right(self.__wordlist, word, lo=init)
 
         if i:
             return i
 
         raise ValueError()
-
 
     #--------------------------------------------------------------------------
     def clone(self):
@@ -430,22 +525,20 @@ class AdvancedListWordlist(AbstractWordlist):
 
         return m_temp
 
-
     #--------------------------------------------------------------------------
     def pop(self):
         return self.__wordlist.pop()
 
 
 #------------------------------------------------------------------------------
-class AdvancedDicWordlist(object):
+class WDict(object):
     """
     Advanced wordlist that loads a wordlist with a separator character as a dict, like:
 
-    word list 1; sencond value of wordlist
+    word list 1; second value of wordlist
 
-    These line load as => {'word list 1':'sencond value of wordlist'}.
+    These line load as => {'word list 1':'second value of wordlist'}.
     """
-
 
     #--------------------------------------------------------------------------
     def __init__(self, wordlist, smart_load=False, separator = ";"):
@@ -465,12 +558,12 @@ class AdvancedDicWordlist(object):
         >>> f=open("wordlist.txt", "rU")
         >>> f.readlines()
         ['one; value1', 'two; value2', 'one; value3']
-        >>> w = AdvancedDicWordlist("wordlist.txt")
+        >>> w = WDict("wordlist.txt")
         >>> w.matches_by_keys("one")
         {'one': [' value1', ' value3']}
 
 
-        If you set to True the param 'smart_load', the AdvancedDicWordlist will try to detect if the values
+        If you set to True the param 'smart_load', the WDict will try to detect if the values
         at the right of 'separator', found by the split, can be pooled as a list an put the values in it.
 
         Example:
@@ -478,7 +571,7 @@ class AdvancedDicWordlist(object):
         >>> f=open("wordlist.txt", "rU")
         >>> f.readlines()
         ['one; value1 value2, value3, value4 "value 5"', 'two; value6', 'one; value7']
-        >>> w = AdvancedDicWordlist("wordlist.txt", smart_load=True)
+        >>> w = WDict("wordlist.txt", smart_load=True)
         >>> w.matches_by_keys("one")
         {'one': ['value1', 'value2', 'value3', 'value4', 'value 5', 'value7']}
 
@@ -527,7 +620,6 @@ class AdvancedDicWordlist(object):
                     self.__wordlist[v[0]] = []
                     self.__wordlist[v[0]].append(v[1])
 
-
     #--------------------------------------------------------------------------
     def matches_by_keys(self, word):
         """
@@ -547,7 +639,6 @@ class AdvancedDicWordlist(object):
         word = str(word)
 
         return { i:v for i, v in self.__wordlist.iteritems() if word == i}
-
 
     #--------------------------------------------------------------------------
     def matches_by_key_with_level(self, word):
@@ -578,7 +669,6 @@ class AdvancedDicWordlist(object):
             m_return_append((i, v, get_diff_ratio(word, i)))
 
         return m_return
-
 
     #--------------------------------------------------------------------------
     def matches_by_value(self, word):
@@ -614,7 +704,6 @@ class AdvancedDicWordlist(object):
 
         return m_return
 
-
     #--------------------------------------------------------------------------
     def matches_by_value_with_level(self, word):
         """
@@ -647,11 +736,9 @@ class AdvancedDicWordlist(object):
 
         return m_return
 
-
     #--------------------------------------------------------------------------
     def __getitem__(self, i):
         return self.__wordlist[i]
-
 
     #--------------------------------------------------------------------------
     def __setitem__(self, i, v):
@@ -660,36 +747,29 @@ class AdvancedDicWordlist(object):
 
         self.__wordlist[i] = v
 
-
     #--------------------------------------------------------------------------
     def __contains__(self, i):
         return i in self.__wordlist
-
 
     #--------------------------------------------------------------------------
     def iteritems(self):
         return self.__wordlist.iteritems()
 
-
     #--------------------------------------------------------------------------
     def __iter__(self):
         return self.__wordlist.__iter__
-
 
     #--------------------------------------------------------------------------
     def __len__(self):
         return len(self.__wordlist)
 
-
     #--------------------------------------------------------------------------
     def itervalues(self):
         return self.__wordlist.itervalues()
 
-
     #--------------------------------------------------------------------------
     def iterkeys(self):
         return self.__wordlist.iterkeys()
-
 
     #--------------------------------------------------------------------------
     def clone(self):
