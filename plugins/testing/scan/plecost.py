@@ -316,7 +316,7 @@ class PlecostPlugin(TestingPlugin):
 
         error_page = get_error_page(url).raw_data
 
-        for u in WordListLoader.get_wordlist_as_raw(wordpress_urls):
+        for u in WordListLoader.get_wordlist_as_list(wordpress_urls):
             total_urls += 1
             tmp_url = urljoin(url, u)
 

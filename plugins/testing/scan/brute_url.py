@@ -552,7 +552,7 @@ def load_wordlists(wordlists):
     # Load the wordlist
     m_return = {}
     for k, w_paths in m_tmp_wordlist.iteritems():
-        m_return[k] = [WordListLoader.get_wordlist_as_raw(w) for w in w_paths]
+        m_return[k] = [WordListLoader.get_wordlist_as_list(w) for w in w_paths]
 
     return m_return
 

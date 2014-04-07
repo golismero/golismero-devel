@@ -94,7 +94,7 @@ class Spider(TestingPlugin):
             pass
 
         # Do not follow URLs that contain certain keywords
-        m_forbidden = [x for x in WordListLoader.get_wordlist_as_raw(Config.plugin_config["wordlist_no_spider"])]
+        m_forbidden = [x for x in WordListLoader.get_wordlist_as_list(Config.plugin_config["wordlist_no_spider"])]
         m_urls_allowed = [
             url for url in m_links if not any(x in url for x in m_forbidden)
         ]
@@ -258,7 +258,7 @@ class Spider(TestingPlugin):
             return True
 
         # If URL path in blacklist?
-        m_forbidden = [x for x in WordListLoader.get_wordlist_as_raw(Config.plugin_config["wordlist_no_spider"])]
+        m_forbidden = [x for x in WordListLoader.get_wordlist_as_list(Config.plugin_config["wordlist_no_spider"])]
         if any(x in url for x in m_forbidden):
             return False
 
