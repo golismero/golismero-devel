@@ -22,6 +22,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 """
 
+import os
 import os.path
 
 from functools import partial
@@ -40,7 +41,8 @@ try:
 except ImportError:
     from xml.etree import ElementTree as etree
 
-from openvas_lib import VulnscanManager, VulnscanException, VulnscanVersionError, VulnscanAuditNotFoundError
+from openvas_lib import VulnscanManager, VulnscanException, \
+    VulnscanVersionError, VulnscanAuditNotFoundError
 from openvas_lib.data import OpenVASResult
 
 from golismero.api.logger import Logger
@@ -51,11 +53,27 @@ from golismero.api.data.resource.domain import Domain
 from golismero.api.net.web_utils import parse_url
 from golismero.api.plugin import TestingPlugin, ImportPlugin
 
-from golismero.api.data.vulnerability import UncategorizedVulnerability, Vulnerability  #noqa
-from golismero.api.data.vulnerability.infrastructure.outdated_platform import * # noqa
-from golismero.api.data.vulnerability.infrastructure.outdated_software import * # noqa
-from golismero.api.data.vulnerability.information_disclosure.insecure_method import * # noqa
-from golismero.api.data.vulnerability.malware import * # noqa
+
+#------------------------------------------------------------------------------
+# This imports every Vulnerability subclass.
+from golismero.api.data import vulnerability
+from golismero.api.data.vulnerability import *
+base = os.path.abspath(os.path.dirname(vulnerability.__file__))
+for root, directories, filenames in os.walk(base):
+    for name in filenames:
+        if name.endswith(".py"):
+            name = os.path.join(root, name)
+            name = os.path.abspath(name)
+            name = os.path.splitext(name)[0]
+            name = name[len(base):]
+            name = name.replace(os.path.sep, ".")
+            if name.startswith("."):
+                name = name[1:]
+            if name.endswith("."):
+                name = name[:-1]
+            if name:
+                name = "golismero.api.data.vulnerability." + name
+                __import__(name, fromlist=["*"])
 
 
 #------------------------------------------------------------------------------
