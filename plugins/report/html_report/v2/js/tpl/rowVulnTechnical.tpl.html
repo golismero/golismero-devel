@@ -1,0 +1,67 @@
+<tr data-anchor="technical-${identity}" class="headData expanded" ng-init="show=true">
+	<td style="width:30px" ng-click="show= !show"><span class="glyphicon glyphicon-plus " ng-show="show==false"></span> <span class="glyphicon glyphicon-minus expanded" ng-show="show == true"></td>
+	<td style="width:245px">{{item.identity}}</td>
+	<td style="width:370px"><p class="large">{{obtainTarget(item.links)}}</p></td>
+	<td style="">{{item.display_name}}</td>
+	<td style="width:80px"><span class="bold {{obtainLevel(item.level)}}Vulnerability">{{obtainLevel(item.level)}}</span></td>
+</tr>
+<tr class="openVulnerabilitiesRow" ng-show="show"><td colspan="5">
+<div class="row ">
+	<div class="col-sm-12">
+		<h4>{{item.title}}</h4>
+		<div class="well">
+			<div class="row">
+				<div class="col-sm-12">
+					<div class="item-form"><span class="bold">Target:</span>{{obtainTarget(item.links)}}</div>
+				</div>
+			</div>
+			<div class="row">				
+				<div class="col-sm-4">
+					<div class="item-form"><span class="bold">Vulnerability:</span>{{item.display_name}}&nbsp;({{item.data_subtype}}) </div>
+				</div>
+				<div class="col-sm-4">
+					<div class="item-form"><span class="bold ">Criticality:</span><span class="´{{obtainLevel(item.level)}}Vulnerability bold">{{obtainLevel(item.level)}}</span> </div>
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-sm-4">
+					<div class="item-form"><span class="bold">Plugin ID:</span>{{item.plugin_id}}</div> 
+				</div>
+				<div class="col-sm-4">
+					<div class="item-form"><span class="bold">Plugin name:</span>{{item.plugin_name}}</div>
+				</div>	
+				<div class="col-sm-4">
+				</div>			
+			</div>
+			<div class="row">
+				<div class="col-sm-4">
+					<div class="item-form"><span class="bold">Impact:</span></span>{{item.impact}} </div>
+				</div>
+				<div class="col-sm-4">
+					<div class="item-form"><span class="bold">Severity:</span>{{item.severity}}</div>
+				</div>	
+				<div class="col-sm-4">
+					<div class="item-form"><span class="bold">Risk:</span>{{item.risk}}</div>
+				</div>			
+			</div>
+			
+		</div>
+		
+		<div class="well" ng-if="item.taxonomy">
+			<span class="bold">Taxonomy:</span>
+			<div ng-repeat="tax in item.taxonomy">{{tax}}</div>
+			
+		</div>
+		<div class="well" ng-if="item.description">
+				<span class="bold">Description:</span> <pre>{{item.description}}</pre>
+			</div>
+		<div class="well" ng-if="item.solution">
+			<span class="bold">Solution:</span> <pre>{{item.solution}}</pre>
+		</div>
+		<div class="well" ng-if="true">	
+			<span class="bold">References:</span>
+			<div ng-repeat="item in item.references"><a href="{{item}}" target="_blank">{{item}}</a></div>
+   		</div>
+   	</div>
+   </div>
+ </td></tr>
