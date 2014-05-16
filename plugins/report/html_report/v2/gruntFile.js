@@ -79,7 +79,7 @@ module.exports = function ( grunt ) {
             src: ['build/index-orig.html'],
             dest: ['build/index.html']
         }
-    },
+    }, 
 
   
 
