@@ -80,10 +80,6 @@ module.exports = function ( grunt ) {
             dest: ['build/index.html']
         }
     }, 
-
-  
-
-   
     delta: {
     
       options: {
