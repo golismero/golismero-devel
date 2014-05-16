@@ -70,6 +70,14 @@ module.exports = function ( grunt ) {
             },
             src: ['index-orig.html'],
             dest: ['build/']
+        },
+        pdfmake: {
+            options:{
+                cssmin: true,
+                tag:'__notMinifiedInline'
+            },
+            src: ['build/index-orig.html'],
+            dest: ['build/index.html']
         }
     },
 
@@ -115,6 +123,6 @@ module.exports = function ( grunt ) {
    * The `build` task gets your app ready to run for development and testing.
    */
   grunt.registerTask( 'build', [
-    'clean', 'html2js', 'less:build', 'less:minify', 'inline'
+    'clean', 'html2js', 'less:build', 'less:minify', 'inline:dist'
   ]);
 };

@@ -65,10 +65,25 @@ function initToTop(){
 	    		}
 	    		
 	    	}
+	    	function initAnchor(){
+				//clic en un enlace de la lista
+				$('.anchor').on('click touchstart',function(e){
+					e.preventDefault();					
+					var strAnchor=$(this).attr('href');
+					if($(this).data("href")){
+						strAnchor=$(this).data("href");
+					}
+					$('body,html').stop(true,true).animate({
+						scrollTop: $("[data-anchor='"+strAnchor+"']").first().offset().top -80
+					},1000);
+				});
+
+	    	}
 	    	
 	    	$(document).ready(function(){
 	    		initToTop();								
 				initLateralMenu();
+				initAnchor();
 				//colocar mismo alto todos los quickInfo
 				var maxHeigth=0;
 				$(".quickInfo").each(function(){

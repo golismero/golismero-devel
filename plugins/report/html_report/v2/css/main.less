@@ -249,6 +249,8 @@ tr.targetRow, tr.resourceRow, tr.vulnerabilityRow,{
 		border:1px solid #000;
 		font-weight: bold;
 		font-size: 11pt;
+		overflow: hidden;
+		text-overflow: ellipsis;
 		.glyphicon-chevron-down,.glyphicon-chevron-up{
 			display: none;
 			float:right;
@@ -260,7 +262,7 @@ tr.targetRow, tr.resourceRow, tr.vulnerabilityRow,{
 	td{
 		border:1px solid #000;
 		background: white;	
-		white-space:nowrap;
+		white-space:normal;
 			overflow:hidden;
 			text-overflow: ellipsis; 
 		p.large{
@@ -309,6 +311,8 @@ tr.targetRow, tr.resourceRow, tr.vulnerabilityRow,{
 	}
 }
 
+
+
 #hideShowAll{
 	font-weight: bold;
 	cursor: pointer;
@@ -325,27 +329,108 @@ tr.targetRow, tr.resourceRow, tr.vulnerabilityRow,{
 
 .moreInfo{
 	text-decoration: underline;
+	cursor: pointer;
 }
 
 .table-row{
+	table-layout: fixed;
 	margin-bottom: 0;
 	border-bottom: 0;
+	background:#fff;
 	tbody>tr>td{
 		border-bottom: 0;
+		vertical-align: middle;
+		white-space: normal;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.tdRowTechCollapse{
+		width: 30px;
+	}
+	.tdRowTechIdentity{
+		width:245px;
+	}
+	.tdRowTechTarget{
+		width:40%;
+	}
+	.tdRowTechVuln{
+		width: 60%;
+	}
+	.tdRowTechLevel{
+		width:80px;
 	}
 }
 
+select{
+	width:100%;
+}
+
+.editable-wrap{
+	width: 100%;
+	.editable-input{
+		width: 100%;
+	}
+}
+
+.modal-body{
+	padding:10px;
+	.tab-content{
+		padding-top: 10px;
+	}
+	.submenu{
+		padding-left: 10px; 
+	}
+	.img-logo {
+		height:120px;
+		margin-bottom: 10px;
+	}
+
+}
+.modal-footer{
+	margin-top:0;
+	padding: 8px 20px;
+}
+.modal-header{
+	padding: 8px;
+}
+
 @tabletLandscape:    ~"only screen and (max-width: 1024px)";
-@tabletStandar:    ~"only screen and (max-width: 1024px)";
+@mobilePortrait:    ~"only screen and (max-width: 768px)";
 
 /*tablets*/
 @media @tabletLandscape{
 	
 }
 
-@media @tabletStandar{
-	
+@media @mobilePortrait{
+	h4{
+		font-size: 17px;
+	}
+	.table-row{
+		.tdRowTechCollapse{
+			padding: 4px;
+			width: 4%;
+		}
+		.tdRowTechIdentity{
+			width:48%;
+		}
+		.tdRowTechTarget{
+			width:48%;
+		}
+		.tdRowTechVuln{
+			width: 0;
+		}
+		.tdRowTechLevel{
+			width:0;
+		}
+	}
+	.table-responsive>.table-bordered>thead>tr>th:first-child, .table-responsive>.table-bordered>tbody>tr>th:first-child, .table-responsive>.table-bordered>tfoot>tr>th:first-child, .table-responsive>.table-bordered>thead>tr>td:first-child, .table-responsive>.table-bordered>tbody>tr>td:first-child, .table-responsive>.table-bordered>tfoot>tr>td:first-child{
+		border-left: 1px solid #ddd;
+	}
 }
+
+
 
 @media print {
   	@page {

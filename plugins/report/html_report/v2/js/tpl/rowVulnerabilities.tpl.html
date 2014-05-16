@@ -1,5 +1,6 @@
-<td>{{item.identity}}</td>
-<td><p class="large" tooltip  data-toggle="tooltip" data-placement="bottom" title="{{item.resource}}" data-original-title="{{item.resource}}">{{item.resource }}</p></td>		
-<td>{{item.display_name}}</td>
-<td><span class="bold {{obtainLevel(item.level)}}Vulnerability">{{obtainLevel(item.level)}}</span></td>
-<td class="anchor moreInfo" ng-click="goTo(item.identity)">Details</td>
+<td editable-text="item.nameIdentity" buttons="no">{{item.nameIdentity}}</td>
+<td><p class="large" tooltip="{{item.resource}}" tooltip-placement="bottom">{{item.resource }}</p></td>		
+<td ><span editable-text="item.display_name" onaftersave="updateVulnerabilityType(item)" buttons="no"> {{item.display_name}}</span></td>
+<td><span class="bold {{obtainLevel(item.level)}}Vulnerability" editable-select="item.level" buttons="no" e-ng-options="s.value as s.label for s in levels" onaftersave="updateLevels(item)">{{obtainLevel(item.level)}}</span></td>
+<td><span ng-click="deleteItem($index, item)" class="glyphicon glyphicon-remove"></span></td>
+<td class="moreInfo" ng-click="goTo(item.identity)">Details</td>
