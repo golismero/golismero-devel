@@ -91,14 +91,40 @@ angular.module("custompdf.tpl.html", []).run(["$templateCache", function($templa
     "		    	</div>\n" +
     "		    </div>\n" +
     "    	</tab>\n" +
-    "    	<tab heading=\"Styles\">\n" +
-    "    		Estilos\n" +
+    "    	<tab heading=\"Styles\" >\n" +
+    "    		\n" +
+    "			<fieldset class=\"dataStyle\" ng-repeat=\"(key, value) in general.styles\">\n" +
+    "    			<legend>{{key}} <span class=\"description\" tooltip=\"{{value.description}}\"><i class=\"glyphicon glyphicon-info-sign\" ></i></span></legend>\n" +
+    "    			<div class=\"contentlegend\">\n" +
+    "    				<div class=\"dataStyleRow\">\n" +
+    "    					<div>Font-size:</div>\n" +
+    "    					<input type=\"number\" ng-model=\"value.fontSize\"/>\n" +
+    "    				</div>\n" +
+    "    				<div class=\"dataStyleRow\">\n" +
+    "    					<div>Bold</div>\n" +
+    "    					<input type=\"checkbox\" ng-model=\"value.bold\"/>\n" +
+    "    				</div>\n" +
+    "    				\n" +
+    "    				<div class=\"dataStyleRow\">\n" +
+    "    					<div>Align:</div>\n" +
+    "    					<select ng-model=\"value.alignment\">\n" +
+    "	    					<option value=\"left\">left</option>\n" +
+    "	    					<option value=\"right\">right</option>\n" +
+    "	    				</select>\n" +
+    "    				</div>\n" +
+    "    				<div class=\"dataStyleRow\">\n" +
+    "    					<div>Color:</div>\n" +
+    "    					<input type=\"text\" colorpicker ng-model=\"value.color\"/>\n" +
+    "    				</div>\n" +
+    "    			</div>\n" +
+    "    		</fieldset>\n" +
+    "    	\n" +
     "    	</tab>\n" +
     "    </tabset>\n" +
     "</div>\n" +
     "<div class=\"modal-footer\">\n" +
-    "    <button class=\"btn btn-default\" ng-click=\"generate('open')\">Open (recomended firefox and chrome)</button>\n" +
-    "    <button class=\"btn btn-default\" ng-click=\"generate('save')\">Save (recomended ie)</button>\n" +
+    "    <button class=\"btn btn-default\" ng-click=\"generate('open')\">Open</button>\n" +
+    "    <button class=\"btn btn-default\" ng-click=\"generate('save')\">Save (recomended for IE)</button>\n" +
     "    <button class=\"btn btn-primary\" ng-click=\"cancel()\">Cancel</button>\n" +
     "</div>");
 }]);
@@ -108,7 +134,7 @@ angular.module("rowVulnTechnical.tpl.html", []).run(["$templateCache", function(
     "<tr data-anchor=\"technical-{{item.identity}}\" class=\"headData expanded\" ng-init=\"show=true\">\n" +
     "	<td  ng-click=\"show= !show\" class=\"tdRowTechCollapse\"><span class=\"glyphicon glyphicon-plus \" ng-show=\"show==false\"></span> <span class=\"glyphicon glyphicon-minus expanded\" ng-show=\"show == true\"></span></td>\n" +
     "	<td  class=\"tdRowTechIdentity\" ><span editable-text=\"item.nameIdentity\" buttons=\"no\">{{item.nameIdentity}}</span></td>\n" +
-    "	<td  class=\"tdRowTechTarget\"><p class=\"large\">{{item.resource}}</p></td>\n" +
+    "	<td  class=\"tdRowTechTarget\"><span class=\"large\">{{item.resource}}</span></td>\n" +
     "	<td  class=\"tdRowTechVuln hidden-xs\" ><span editable-text=\"item.display_name\" onaftersave=\"updateVulnerabilityType(item)\" buttons=\"no\">{{item.display_name}}</span></td>\n" +
     "	<td  class=\"tdRowTechLevel hidden-xs\" ><div editable-select=\"item.level\" e-ng-options=\"s.value as s.label for s in levels\" buttons=\"no\"  onaftersave=\"updateLevels(item)\"><span class=\"bold {{obtainLevel(item.level)}}Vulnerability\">{{obtainLevel(item.level)}}</span></div></td>\n" +
     "</tr>\n" +
@@ -124,7 +150,7 @@ angular.module("rowVulnTechnical.tpl.html", []).run(["$templateCache", function(
     "			</div>\n" +
     "			<div class=\"row\">				\n" +
     "				<div class=\"col-sm-4\">\n" +
-    "					<div class=\"item-form\"><span class=\"bold\">Vulnerability:</span><span editable-text=\"item.display_name\" buttons=\"no\" onaftersave=\"updateVulnerabilityType(item)\">{{item.display_name}}</span>&nbsp;(<span editable-text=\"item.data_subtype\" buttons=\"no\">{{item.data_subtype}}</span>) </div>\n" +
+    "					<div class=\"item-form\"><span class=\"bold\">Vulnerability:</span><span class=\"editable editable-click\" editable-text=\"item.display_name\" buttons=\"no\" onaftersave=\"updateVulnerabilityType(item)\">{{item.display_name}}</span>&nbsp;(<span editable-text=\"item.data_subtype\" buttons=\"no\">{{item.data_subtype}}</span>) </div>\n" +
     "				</div>\n" +
     "				<div class=\"col-sm-4\">\n" +
     "					<div class=\"item-form\"><span class=\"bold \">Criticality:</span><span class=\"{{obtainLevel(item.level)}}Vulnerability bold\" editable-select=\"item.level\" e-ng-options=\"s.value as s.label for s in levels\" buttons=\"no\"  onaftersave=\"updateLevels(item)\">{{obtainLevel(item.level)}}</span> </div>\n" +
@@ -177,11 +203,11 @@ angular.module("rowVulnTechnical.tpl.html", []).run(["$templateCache", function(
 
 angular.module("rowVulnerabilities.tpl.html", []).run(["$templateCache", function($templateCache) {
   $templateCache.put("rowVulnerabilities.tpl.html",
-    "<td editable-text=\"item.nameIdentity\" buttons=\"no\">{{item.nameIdentity}}</td>\n" +
-    "<td><p class=\"large\" tooltip=\"{{item.resource}}\" tooltip-placement=\"bottom\">{{item.resource }}</p></td>		\n" +
+    "<td editable-text=\"item.nameIdentity\" buttons=\"no\"><span>{{item.nameIdentity}}</span></td>\n" +
+    "<td><span class=\"large\" tooltip=\"{{item.resource}}\" tooltip-placement=\"bottom\">{{item.resource }}</span></td>		\n" +
     "<td ><span editable-text=\"item.display_name\" onaftersave=\"updateVulnerabilityType(item)\" buttons=\"no\"> {{item.display_name}}</span></td>\n" +
-    "<td><span class=\"bold {{obtainLevel(item.level)}}Vulnerability\" editable-select=\"item.level\" buttons=\"no\" e-ng-options=\"s.value as s.label for s in levels\" onaftersave=\"updateLevels(item)\">{{obtainLevel(item.level)}}</span></td>\n" +
-    "<td><span ng-click=\"deleteItem($index, item)\" class=\"glyphicon glyphicon-remove\"></span></td>\n" +
-    "<td class=\"moreInfo\" ng-click=\"goTo(item.identity)\">Details</td>\n" +
+    "<td class=\"editable editable-click\"><span class=\"bold {{obtainLevel(item.level)}}Vulnerability\" editable-select=\"item.level\" buttons=\"no\" e-ng-options=\"s.value as s.label for s in levels\" onaftersave=\"updateLevels(item)\">{{obtainLevel(item.level)}}</span></td>\n" +
+    "<td><div ng-click=\"deleteItem($index, item)\" class=\"trash\"></div></td>\n" +
+    "<td class=\"moreInfo\" ng-click=\"goTo(item.identity)\"><span>Details</span></td>\n" +
     "");
 }]);

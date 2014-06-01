@@ -73,13 +73,39 @@
 		    	</div>
 		    </div>
     	</tab>
-    	<tab heading="Styles">
-    		Estilos
+    	<tab heading="Styles" >
+    		
+			<fieldset class="dataStyle" ng-repeat="(key, value) in general.styles">
+    			<legend>{{key}} <span class="description" tooltip="{{value.description}}"><i class="glyphicon glyphicon-info-sign" ></i></span></legend>
+    			<div class="contentlegend">
+    				<div class="dataStyleRow">
+    					<div>Font-size:</div>
+    					<input type="number" ng-model="value.fontSize"/>
+    				</div>
+    				<div class="dataStyleRow">
+    					<div>Bold</div>
+    					<input type="checkbox" ng-model="value.bold"/>
+    				</div>
+    				
+    				<div class="dataStyleRow">
+    					<div>Align:</div>
+    					<select ng-model="value.alignment">
+	    					<option value="left">left</option>
+	    					<option value="right">right</option>
+	    				</select>
+    				</div>
+    				<div class="dataStyleRow">
+    					<div>Color:</div>
+    					<input type="text" colorpicker ng-model="value.color"/>
+    				</div>
+    			</div>
+    		</fieldset>
+    	
     	</tab>
     </tabset>
 </div>
 <div class="modal-footer">
-    <button class="btn btn-default" ng-click="generate('open')">Open (recomended firefox and chrome)</button>
-    <button class="btn btn-default" ng-click="generate('save')">Save (recomended ie)</button>
+    <button class="btn btn-default" ng-click="generate('open')">Open</button>
+    <button class="btn btn-default" ng-click="generate('save')">Save (recomended for IE)</button>
     <button class="btn btn-primary" ng-click="cancel()">Cancel</button>
 </div>

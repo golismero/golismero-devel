@@ -1,7 +1,7 @@
 <tr data-anchor="technical-{{item.identity}}" class="headData expanded" ng-init="show=true">
 	<td  ng-click="show= !show" class="tdRowTechCollapse"><span class="glyphicon glyphicon-plus " ng-show="show==false"></span> <span class="glyphicon glyphicon-minus expanded" ng-show="show == true"></span></td>
 	<td  class="tdRowTechIdentity" ><span editable-text="item.nameIdentity" buttons="no">{{item.nameIdentity}}</span></td>
-	<td  class="tdRowTechTarget"><p class="large">{{item.resource}}</p></td>
+	<td  class="tdRowTechTarget"><span class="large">{{item.resource}}</span></td>
 	<td  class="tdRowTechVuln hidden-xs" ><span editable-text="item.display_name" onaftersave="updateVulnerabilityType(item)" buttons="no">{{item.display_name}}</span></td>
 	<td  class="tdRowTechLevel hidden-xs" ><div editable-select="item.level" e-ng-options="s.value as s.label for s in levels" buttons="no"  onaftersave="updateLevels(item)"><span class="bold {{obtainLevel(item.level)}}Vulnerability">{{obtainLevel(item.level)}}</span></div></td>
 </tr>
@@ -17,7 +17,7 @@
 			</div>
 			<div class="row">				
 				<div class="col-sm-4">
-					<div class="item-form"><span class="bold">Vulnerability:</span><span editable-text="item.display_name" buttons="no" onaftersave="updateVulnerabilityType(item)">{{item.display_name}}</span>&nbsp;(<span editable-text="item.data_subtype" buttons="no">{{item.data_subtype}}</span>) </div>
+					<div class="item-form"><span class="bold">Vulnerability:</span><span class="editable editable-click" editable-text="item.display_name" buttons="no" onaftersave="updateVulnerabilityType(item)">{{item.display_name}}</span>&nbsp;(<span editable-text="item.data_subtype" buttons="no">{{item.data_subtype}}</span>) </div>
 				</div>
 				<div class="col-sm-4">
 					<div class="item-form"><span class="bold ">Criticality:</span><span class="{{obtainLevel(item.level)}}Vulnerability bold" editable-select="item.level" e-ng-options="s.value as s.label for s in levels" buttons="no"  onaftersave="updateLevels(item)">{{obtainLevel(item.level)}}</span> </div>

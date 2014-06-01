@@ -91,8 +91,8 @@ function initToTop(){
 						maxHeigth= $(this).outerHeight(false);
 					}
 				});
-				if(maxHeigth>220){
-					maxHeigth = 220;
+				if(maxHeigth>290){
+					maxHeigth = 290;
 				}
 				$(".quickInfo").each(function(){					
 					$(this).css("height", maxHeigth+"px");

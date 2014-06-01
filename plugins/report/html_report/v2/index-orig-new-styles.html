@@ -5,13 +5,16 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<link rel="stylesheet" type="text/css" href="./build/css/main.css?__inline=true">	
 		<link rel="stylesheet" type="text/css" href="./jspdf/xeditable.css?__inline=true">	
+		
 		<style>
 			.editable-buttons{
 				display: block !important;
 			}
 		</style>		
 	</head>
-	<body ng-controller="reportController">
+	<body ng-controller="reportController" ng-class="{contrast: contrast==true}">
+		<div id="loading" ng-show="!loaded || loaded ==false"></div>
+		
 		<div class="navbar navbar-inverse " role="navigation">
 	      <div class="container">
 	        <div class="navbar-header">
@@ -29,7 +32,8 @@
 				<li><a href="vulnerabilitiesTable" class="anchor">Vulnerabilities</a></li>
 	            <li><a href="technicalReportTable" class="anchor">Technical report</a></li>
 	            <li ng-click="downloadPdf()"><a href="#">Generate PDF</a></li>
-	           
+	            <li ng-click="contrast=true" ng-show="!contrast || contrast==false"><a href="#">Dark theme</a></li>
+	            <li ng-click="contrast=false" ng-show="contrast==true"><a href="#">Light theme</a></li>
 	          </ul>
 	        </div><!-- /.nav-collapse -->	        
 	      </div><!-- /.container -->
@@ -48,21 +52,29 @@
 			</div>
 			<div class="row" data-anchor="quickInfo">
 				<div class="col-sm-4 ">
-					<div class="well quickInfo">
-						<span class="glyphicon glyphicon-record"></span>
-						<div class="text-right info-links">
-							<p class="title">Targets</p>
+					<div class="well quickInfo vulnsWell">
+						<div class="panel-heading">
+							<span class="glyphicon glyphicon-record"></span>
+							<h3>Targets</h3>
+						</div>	
+						
+						<div class=" info-links">
+							
 							<ul id="targetsResume">
-								<li ng-repeat="(key, value) in targetsResume">{{value.display_content}};</li>
+								<li ng-repeat="(key, value) in targetsResume">{{value.display_content}}</li>
 							</ul>
 						</div>
 					</div>
 				</div>
 				<div class="col-sm-4 " >
-					<div class="well quickInfo">
-						<span class="glyphicon glyphicon-time"></span>
-						<div class="text-right info-links">
-							<p class="title">Time</p>
+					<div class="well quickInfo vulnsWell">
+						<div class="panel-heading">
+							<span class="glyphicon glyphicon-time"></span>
+							<h3>Time</h3>
+						</div>	
+						
+						<div class=" info-links">
+							
 							<p class="info"><span class="bold">Start:</span><span editable-text="summary.start_time" buttons="no">{{summary.start_time}}</span></p>
 							<p class="info"><span class="bold">End:</span><span editable-text="summary.stop_time" buttons="no">{{summary.stop_time}}</span></p>
 							<p class="info"><span class="bold">Total:</span><span editable-text="summary.run_time" buttons="no">{{summary.run_time}}</span></p>
@@ -71,10 +83,14 @@
 					</div>
 				</div>
 				<div class="col-sm-4">
-					<div class="well quickInfo">
-						<span class="glyphicon glyphicon-exclamation-sign"></span>
-						<div class="text-right info-links">
-							<p class="title">Vulnerabilities</p>
+					<div class="well quickInfo vulnsWell">
+						<div class="panel-heading">
+							<span class="glyphicon glyphicon-exclamation-sign"></span>
+							<h3>Vulnerabilities</h3>
+						</div>	
+						
+						<div class="info-links" >
+							
 							<div class="table-responsive">
 							  <table class="table table-bordered table-summary">
 							    <thead>
@@ -117,21 +133,27 @@
 			</div>
 			<div class="row" ng-controller="reportController-chart">
 				<div class="col-sm-4">
-					<div class="well">
-						<h3>Vulnerabilities by criticality</h3>
+					<div class="well vulnsWell">
+						<div class="panel-heading">
+							<h3>Vulnerabilities by criticality</h3>
+						</div>						
 						<div id="chartByCriticality" ui-chart="chartByCriticality" chart-options="myChartOpts" style="height:400px"></div>
 						
 					</div>
 				</div>
 				<div class="col-sm-4">
-					<div class="well">
-						<h3>Vulnerabilities by type</h3>						
+					<div class="well vulnsWell">
+						<div class="panel-heading">
+							<h3>Vulnerabilities by type</h3>
+						</div>
 						<div id="chartByType" ui-chart="chartByType" resize="true" chart-options="myChartOpts" style="height:400px"></div>
 					</div>
 				</div>
 				<div class="col-sm-4">
-					<div class="well">
-						<h3>Vulnerabilities by target</h3>
+					<div class="well vulnsWell">
+						<div class="panel-heading">
+							<h3>Vulnerabilities by target</h3>
+						</div>
 						<div id="chartByTarget" ui-chart="chartByTarget" resize="true" chart-options="myChartOpts" style="height:400px"></div>
 						
 					</div>
@@ -140,74 +162,84 @@
 			
 			<div class="row break-after">
 				<div class="col-sm-12">
-					<div class="table-responsive well">
-						<h3 data-anchor="vulnerabilitiesTable">Vulnerabilities summary</h3>
-						<table class="table table-bordered" id="tableVulnerabilities">
-						    <thead>
-					          <tr id="headVulnerability">
-					            <th style="width:245px" ng-click="sortBy('identity')" ng-class="{sort:field=='identity', 'asc':(field=='identity' && dir=='+'), 'logicaldesc':(field=='identity' && dir=='-')}" >ID <span class="glyphicon glyphicon-chevron-down"></span> <span class="glyphicon glyphicon-chevron-up"></span></th>
+					<div class="well vulnsWell">
+						<div class="panel-heading">
+							<h3 data-anchor="vulnerabilitiesTable">Vulnerabilities summary</h3>
+						</div>						
+						<div class="table-responsive">
+							
+							<table class="table table-bordered" id="tableVulnerabilities">
+							    <thead>
+						          <tr id="headVulnerability">
+						            <th style="width:245px" ng-click="sortBy('identity')" ng-class="{sort:field=='identity', 'asc':(field=='identity' && dir=='+'), 'logicaldesc':(field=='identity' && dir=='-')}" >ID <span class="glyphicon glyphicon-chevron-down"></span> <span class="glyphicon glyphicon-chevron-up"></span></th>
 
-					            <th style="width: 60%" ng-click="sortBy('resource')" ng-class="{sort:field=='resource', 'asc':(field=='resource' && dir=='+'), 'logicaldesc':(field=='resource' && dir=='-')}">Target<span class="glyphicon glyphicon-chevron-down"></span> <span class="glyphicon glyphicon-chevron-up"></span></th>
+						            <th style="width: 60%" ng-click="sortBy('resource')" ng-class="{sort:field=='resource', 'asc':(field=='resource' && dir=='+'), 'logicaldesc':(field=='resource' && dir=='-')}">Target<span class="glyphicon glyphicon-chevron-down"></span> <span class="glyphicon glyphicon-chevron-up"></span></th>
 
-					            <th style="width: 40%" ng-click="sortBy('display_name')" ng-class="{sort:field=='display_name', 'asc':(field=='display_name' && dir=='+'), 'logicaldesc':(field=='display_name' && dir=='-')}">Vulnerability<span class="glyphicon glyphicon-chevron-down"></span> <span class="glyphicon glyphicon-chevron-up"></span></th>
+						            <th style="width: 40%" ng-click="sortBy('display_name')" ng-class="{sort:field=='display_name', 'asc':(field=='display_name' && dir=='+'), 'logicaldesc':(field=='display_name' && dir=='-')}">Vulnerability<span class="glyphicon glyphicon-chevron-down"></span> <span class="glyphicon glyphicon-chevron-up"></span></th>
 
-					            <th style="width:102px" ng-click="sortBy('level')" ng-class="{sort:field=='level', 'asc':(field=='level' && dir=='-'), 'logicaldesc':(field=='level' && dir=='+')}">Criticality<span class="glyphicon glyphicon-chevron-down"></span> <span class="glyphicon glyphicon-chevron-up"></span></th>
-					            <th style="width:30px"></th>
-					            <th style="width:58px"></th>
-					          </tr>
-					          <tr class="filter">
-									<th></th>
-									<th>
-										<select id="targetFilterTable" name="targetFilterTable" ng-model="search.resource" ng-options="value as value for value in targets ">
+						            <th style="width:102px" ng-click="sortBy('level')" ng-class="{sort:field=='level', 'asc':(field=='level' && dir=='-'), 'logicaldesc':(field=='level' && dir=='+')}">Criticality<span class="glyphicon glyphicon-chevron-down"></span> <span class="glyphicon glyphicon-chevron-up"></span></th>
+						            <th style="width:30px"></th>
+						            <th style="width:58px"></th>
+						          </tr>
+						          <tr class="filter">
+										<th></th>
+										<th>
+											<select id="targetFilterTable" name="targetFilterTable" ng-model="search.resource" ng-options="value as value for value in targets ">
 
-										</select>
-									</th>
-									<th>
-										<select id="vulnerabilityFilterTable" name="vulnerabilityFilterTable" ng-model="search.display_name" ng-options="item.display_name as item.display_name for item in vulnerabilitiesSelect | unique:'display_name'">
-											
-										</select>
-									</th>
-									<th>
-										<select id="criticalityFilterTable" name="vulnerabilityFilterTable" ng-model="search.level">
-											<option value=""></option>
-											<option value="4">Informational</option>
-											<option value="3">Low</option>
-											<option value="2">Middle</option>
-											<option value="1">High</option>
-											<option value="0">Critical</option>
-										</select>
-									</th>
-									<th></th>
-									<th></th>
-					        	</tr>
-					        	
-					        </thead>
-					        <tbody>
-					        	<tr ng-include="'rowVulnerabilities.tpl.html'" ng-repeat="item in vulnerabilitiesFilter = (vulnerabilities | filter:search | orderBy : order)">
-					        	</tr>
-					        </tbody>
-					  	</table>
-					  	<div >Total: {{vulnerabilitiesFilter.length}}</span></div>
+											</select>
+										</th>
+										<th>
+											<select id="vulnerabilityFilterTable" name="vulnerabilityFilterTable" ng-model="search.display_name" ng-options="item.display_name as item.display_name for item in vulnerabilitiesSelect | unique:'display_name'">
+												
+											</select>
+										</th>
+										<th>
+											<select id="criticalityFilterTable" name="vulnerabilityFilterTable" ng-model="search.level">
+												<option value=""></option>
+												<option value="4">Informational</option>
+												<option value="3">Low</option>
+												<option value="2">Middle</option>
+												<option value="1">High</option>
+												<option value="0">Critical</option>
+											</select>
+										</th>
+										<th></th>
+										<th></th>
+						        	</tr>
+						        	
+						        </thead>
+						        <tbody>
+						        	<tr ng-include="'rowVulnerabilities.tpl.html'" ng-repeat="item in vulnerabilitiesFilter = (vulnerabilities | filter:search | orderBy : order)">
+						        	</tr>
+						        </tbody>
+						  	</table>
+						  	<div >Total: {{vulnerabilitiesFilter.length}}</span></div>
+						</div>
 					</div>
 				</div>
 			</div>
 			<div class="row break-after">
 				<div class="col-sm-12">
-					<div class="table-responsive well">
-						<h3 data-anchor="technicalReportTable">Technical report</h3>
-						<span class="pull-right" id="hideShowAll" data-show="true">Hide all</span>
-					  	<table class="table table-bordered table-row " id="tableTechnicalReport" >
-						   <tbody>
-								<tr id="headVulnerability">
-									<th class="tdRowTechCollapse" ></span></th>
-						            <th class="tdRowTechIdentity">ID</span></th>
-						            <th class="tdRowTechTarget" >Target</th>
-						            <th class="tdRowTechVuln hidden-xs">Vulnerability</th>
-						            <th class="tdRowTechLevel hidden-xs">Criticality</th>
-						          </tr>
-						   </tbody>
-					  	</table>
-					  	<table class="table table-bordered table-row" ng-include="'rowVulnTechnical.tpl.html'" ng-repeat="item in vulnerabilities"></table>
+					<div class="well vulnsWell">
+						<div class="panel-heading">
+							<h3 data-anchor="technicalReportTable">Technical report</h3>
+						</div>
+						<div class="table-responsive ">
+							
+							
+						  	<table class="table table-bordered table-row " id="tableTechnicalReport" >
+							   <tbody>
+									<tr id="headVulnerability">
+										<th class="tdRowTechCollapse" ></span></th>
+							            <th class="tdRowTechIdentity">ID</span></th>
+							            <th class="tdRowTechTarget" >Target</th>
+							            <th class="tdRowTechVuln hidden-xs">Vulnerability</th>
+							            <th class="tdRowTechLevel hidden-xs">Criticality</th>
+							          </tr>
+							   </tbody>
+						  	</table>
+						  	<table class="table table-bordered table-row" ng-include="'rowVulnTechnical.tpl.html'" ng-repeat="item in vulnerabilities"></table>
+						</div>
 					</div>
 				</div>
 			</div>

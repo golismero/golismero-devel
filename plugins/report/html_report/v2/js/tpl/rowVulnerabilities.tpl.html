@@ -1,6 +1,6 @@
-<td editable-text="item.nameIdentity" buttons="no">{{item.nameIdentity}}</td>
-<td><p class="large" tooltip="{{item.resource}}" tooltip-placement="bottom">{{item.resource }}</p></td>		
+<td editable-text="item.nameIdentity" buttons="no"><span>{{item.nameIdentity}}</span></td>
+<td><span class="large" tooltip="{{item.resource}}" tooltip-placement="bottom">{{item.resource }}</span></td>		
 <td ><span editable-text="item.display_name" onaftersave="updateVulnerabilityType(item)" buttons="no"> {{item.display_name}}</span></td>
-<td><span class="bold {{obtainLevel(item.level)}}Vulnerability" editable-select="item.level" buttons="no" e-ng-options="s.value as s.label for s in levels" onaftersave="updateLevels(item)">{{obtainLevel(item.level)}}</span></td>
-<td><span ng-click="deleteItem($index, item)" class="glyphicon glyphicon-remove"></span></td>
-<td class="moreInfo" ng-click="goTo(item.identity)">Details</td>
+<td class="editable editable-click"><span class="bold {{obtainLevel(item.level)}}Vulnerability" editable-select="item.level" buttons="no" e-ng-options="s.value as s.label for s in levels" onaftersave="updateLevels(item)">{{obtainLevel(item.level)}}</span></td>
+<td><div ng-click="deleteItem($index, item)" class="trash"></div></td>
+<td class="moreInfo" ng-click="goTo(item.identity)"><span>Details</span></td>
