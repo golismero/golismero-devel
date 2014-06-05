@@ -68,7 +68,7 @@ module.exports = function ( grunt ) {
                 cssmin: true,
                 uglify: true
             },
-            src: [ 'index-orig.html'],
+            src: [ 'index.html'],
             dest: ['build/']
         }
     }, 
