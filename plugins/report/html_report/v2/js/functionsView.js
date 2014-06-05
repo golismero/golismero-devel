@@ -36,7 +36,7 @@ function initToTop(){
 	    
 	    	function initLateralMenu(){
 	    		$("#lateralNavbar").on("click touchstart", function(){
-	    			if($(this).width() >20){
+	    			if($(this).hasClass("showLateralMenu")){
 	    				//desplegada
 	    				hideLateralMenu();
 	    			}else{
