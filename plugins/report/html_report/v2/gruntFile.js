@@ -68,16 +68,8 @@ module.exports = function ( grunt ) {
                 cssmin: true,
                 uglify: true
             },
-            src: ['index-orig.html', 'index-orig-new-styles.html'],
+            src: [ 'index-orig.html'],
             dest: ['build/']
-        },
-        pdfmake: {
-            options:{
-                cssmin: true,
-                tag:'__notMinifiedInline'
-            },
-            src: ['build/index-orig.html'],
-            dest: ['build/index.html']
         }
     }, 
     delta: {

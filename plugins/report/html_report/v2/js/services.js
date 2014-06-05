@@ -1,5 +1,17 @@
 angular.module('golismero-report-services', [])
+.service('browser', ['$window', function($window) {
+	var _self = this;
+    var userAgent = $window.navigator.userAgent;
+    
+    var browsers = {chrome: /chrome/i, safari: /safari/i, firefox: /firefox/i, ie: /internet explorer/i};
+    angular.forEach(browsers, function(key, value) {
 
+        if (key.test(userAgent) && !_self.value) {
+            _self.value = value;
+        }
+    });
+
+}])
 .provider('dataAccess', [ function(){	
 	this.data = {};
 
@@ -12,6 +24,9 @@ angular.module('golismero-report-services', [])
 			targetsMap[key] = val;
 		});
 		
+		service.getData = function(){
+			return data;
+		}
 		service.getTargetById = function(id){
 			if(id){
 				var d = targetsMap[id];
@@ -21,22 +36,37 @@ angular.module('golismero-report-services', [])
 			}
 			return "";
 		};
+		service.getSummary = function(){
+			return data.summary;
+		}
 
 		var vulnerabilitiesByTarget = [];
+
+		var nameResource = service.getSummary().audit_name.toUpperCase();
+		if(service.getSummary().audit_name.length>=3){
+			nameResource = nameResource.substring(0,3);
+		}
+		nameResource +="-";
+		var i = 1;
 		$.each(this.data.vulnerabilities, function(key, val){		
 			//agrego un campo que es el name que le das al id. Sirve para cuando se quiere modificar el id,
 			//realmente no se modifica el id si no un nombre que l epones al id
-			val.nameIdentity = val.identity;
-			val.resource = service.getTargetById(val.target_id);
+			if(!val.nameIdentity){
+
+				val.nameIdentity = nameResource +i;
+				i++;
+			}
+			if(!val.resource){
+
+				val.resource = service.getTargetById(val.target_id);
+			}			
 			if(!vulnerabilitiesByTarget[val['resource']]){
 				vulnerabilitiesByTarget[val['resource']] = 0;
 			}
 			vulnerabilitiesByTarget[val['resource']]+=1;
 		});
 
-		service.getSummary = function(){
-			return data.summary;
-		}
+		
 
 		service.getDataVulnsByLevel= function(){
 			return data.stats.vulns_by_level;
@@ -161,6 +191,46 @@ angular.module('golismero-report-services', [])
 	this.setData = function(data) {
         this.data = data;
     };
+}])
+.factory('saveService', [function(){
+	var doc_impl = document.implementation;
+	var xml_serializer = new XMLSerializer;
+	var service = {};
+	service.saveHTML = function (copyHead, copyBody, data) {
+				
+		var body = "<body ng-controller='reportController' ng-class='{contrast: contrast==true}'>";
+		for (var i = 0; i < copyBody.length; i++) {
+			
+			if($(copyBody[i]).attr("id")==="databaseScript"){
+				body +="<script type='text/javascript' id='databaseScript'>data="+JSON.stringify(data);
+				body+="<";
+				body+="/script>";
+
+			}else{
+				if(copyBody[i].outerHTML !== undefined){
+					body +=copyBody[i].outerHTML+"\n";
+				}
+			}
+			//$(body)[0].appendChild(doc.importNode(copyBody[i], true));
+		}
+		body +="</body>";
+		var head = "<head>";
+		for (var i = 0; i < copyHead.length; i++) {
+			if(copyHead[i].outerHTML !== undefined){
+				head +=copyHead[i].outerHTML+"\n";
+			}
+		}
+		head+="</head>";
+		//$(doc).find("#databaseScript")
+		var html ="<!DOCTYPE html><html ";
+		for (var j=0, attrs=$("html")[0].attributes, l=attrs.length; j<l; j++){
+			html +=" "+attrs.item(j).nodeName+"='"+attrs.item(j).nodeValue+"'";		  
+		}
+		html+=">";
+		
+		saveAs(new window.Blob([html + head+body+"</html>"], {type: "application/octet-stream;charset=" + document.characterSet}), "report.html");
+	};
+	return service; 
 }])
 
 .factory('pdfService', ['dataAccess', function($dataAccess){
@@ -305,8 +375,8 @@ angular.module('golismero-report-services', [])
 		}
 	};
 
-	function createVulnerabilitiesTable(){
-		var vulns = $dataAccess.getTargetTechnical();
+	function createVulnerabilitiesTable(generalInfo){
+		var vulns = generalInfo.targetTechnical;
 		var rows = [[ { text: 'ID', style:'th' }, { text: 'Target', style:'th' }, { text: 'Vulnerability', style:'th' }, { text: 'Criticality', style:'th' } ]];
 		for(var i in vulns){
 			var obj = [
@@ -331,8 +401,8 @@ angular.module('golismero-report-services', [])
 	function obtainTarget(id){
 		return $dataAccess.getTargetById(id);	    		
 	}
-	function createTechnicalTable(){
-		var dataTech = $dataAccess.getTargetTechnical();
+	function createTechnicalTable(generalInfo){
+		var dataTech = generalInfo.targetTechnical;
 		var result = [];
 		for(var tech  in dataTech){
 			var item = dataTech[tech];
@@ -445,12 +515,12 @@ angular.module('golismero-report-services', [])
 		}
 		if(generalInfo.vulnerabilities.showVulnerabilities){
 			dd.content.push({text:"Vulnerabilities", style:"h2"});
-			dd.content.push(createVulnerabilitiesTable())
+			dd.content.push(createVulnerabilitiesTable(generalInfo))
 			dd.content.push(' ');
 		}
 		if(generalInfo.techReport.showTechnicalReport){
 			dd.content.push({text:"Technical report", style:"h2"});
-			var technicalTable = createTechnicalTable();
+			var technicalTable = createTechnicalTable(generalInfo);
 			for(var i in technicalTable){
 				dd.content.push(technicalTable[i]);
 			}

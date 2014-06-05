@@ -1,4 +1,4 @@
-angular.module('templates-app', ['confirm.tpl.html', 'custompdf.tpl.html', 'rowVulnTechnical.tpl.html', 'rowVulnerabilities.tpl.html']);
+angular.module('templates-app', ['confirm.tpl.html', 'custompdf.tpl.html', 'message.tpl.html', 'rowVulnTechnical.tpl.html', 'rowVulnerabilities.tpl.html']);
 
 angular.module("confirm.tpl.html", []).run(["$templateCache", function($templateCache) {
   $templateCache.put("confirm.tpl.html",
@@ -93,7 +93,7 @@ angular.module("custompdf.tpl.html", []).run(["$templateCache", function($templa
     "    	</tab>\n" +
     "    	<tab heading=\"Styles\" >\n" +
     "    		\n" +
-    "			<fieldset class=\"dataStyle\" ng-repeat=\"(key, value) in general.styles\">\n" +
+    "			<fieldset class=\"dataStyle\" ng-repeat=\"(key, value) in general.styles\"> \n" +
     "    			<legend>{{key}} <span class=\"description\" tooltip=\"{{value.description}}\"><i class=\"glyphicon glyphicon-info-sign\" ></i></span></legend>\n" +
     "    			<div class=\"contentlegend\">\n" +
     "    				<div class=\"dataStyleRow\">\n" +
@@ -129,6 +129,21 @@ angular.module("custompdf.tpl.html", []).run(["$templateCache", function($templa
     "</div>");
 }]);
 
+angular.module("message.tpl.html", []).run(["$templateCache", function($templateCache) {
+  $templateCache.put("message.tpl.html",
+    "<div class=\"modal-header\">\n" +
+    "    <h3 class=\"modal-title\">Information</h3>\n" +
+    "</div>\n" +
+    "<div class=\"modal-body\">\n" +
+    "\n" +
+    "    <p ng-show=\"message !== '' \">{{message}}</p>\n" +
+    "    <p ng-show=\"message==='' \">To save the custom report press <img src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADMAAAAWCAYAAABtwKSvAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAK5SURBVFhH3ZdbVuJAEIbZE0uSxBf3YCCvswdNuCzAxxm84DMXBUSCdwHlJsoK/kl1mjadNDnpMU/T5/zn71S6qvrrBA7k8B+N3OfnJx4eHjLVarXi5ZNHlr2pZ+7x8RHr9RpfX1/YbDY/9sVigU6nw7ebPKj3x8dHqrpJvlwuWc8cUdEJUTArbzabfLvJg3qnqZfGqSeDoSeTpXRgVPn/IgFDj5oCWbkuTNq6SS5g6MOTpXRgVPmkUW0f+Xw+pH3URuq1JAFDH6CYLm1exETNC8W9GkzewKx5cg6XDowq36uZfn0bl+E43499GYqFJGDoG0hWA7ZZxTA2H6JqmqgOt3MbDSkvUAxmeYKD/AFOlvyaD3VvqutvuhGNL9Cw/UMUe5ElYObzeUQNlMwKbtn8FpVSaG6W0IjNZenARHODuv5Tr9wq7u2WgJnNZnFdlPhrtlulC0WeLx0YVX64t+FDKddEJGDe398TNEC5WMZgOzeKOI+tkcVgGED8AAL9QpfDqPK3GpQNOa94rlxHEjBvb2+YTqc7vA+36KLPrm/gGhbOEtdPtZ5MUh3Zz1AkIMPFjeK+gKFATGeWfCoKGW5fmasLk1p9F0begNuP3xMwk8kE4/E45KewCg567LoLx3LQZfEenIKF023cn9elvMB1YOS+vncdFPIFON143UmP3+tF4r4LGArIqjMYApDnBBA0CsNE82MwO4a69xh1i578ts9W1M+PW/VQ7FsC5vX1FS8vL7L/PuSv0x6Or0PxqyP/dILX7PCPIs93HRhVPvnV0R7v/63C8fXO9QLm+fmZBbNyXZi0dZNcgnl6esrMdWDS1EvjAob+JFEwK9eFSVs3yRnM/f097u7uWGEK/tSHwyFarRbfbvKgnNFolKpuknuex3rm6Odzu91mZFmIatEPvzQjq95BzwX+AncTqgYgu3pPAAAAAElFTkSuQmCC\"/> on the new tab to save the report</p>\n" +
+    "</div>\n" +
+    "<div class=\"modal-footer\">\n" +
+    "    <button class=\"btn btn-default\" ng-click=\"accept()\">Accept</button>\n" +
+    "</div>");
+}]);
+
 angular.module("rowVulnTechnical.tpl.html", []).run(["$templateCache", function($templateCache) {
   $templateCache.put("rowVulnTechnical.tpl.html",
     "<tr data-anchor=\"technical-{{item.identity}}\" class=\"headData expanded\" ng-init=\"show=true\">\n" +
@@ -136,7 +151,7 @@ angular.module("rowVulnTechnical.tpl.html", []).run(["$templateCache", function(
     "	<td  class=\"tdRowTechIdentity\" ><span editable-text=\"item.nameIdentity\" buttons=\"no\">{{item.nameIdentity}}</span></td>\n" +
     "	<td  class=\"tdRowTechTarget\"><span class=\"large\">{{item.resource}}</span></td>\n" +
     "	<td  class=\"tdRowTechVuln hidden-xs\" ><span editable-text=\"item.display_name\" onaftersave=\"updateVulnerabilityType(item)\" buttons=\"no\">{{item.display_name}}</span></td>\n" +
-    "	<td  class=\"tdRowTechLevel hidden-xs\" ><div editable-select=\"item.level\" e-ng-options=\"s.value as s.label for s in levels\" buttons=\"no\"  onaftersave=\"updateLevels(item)\"><span class=\"bold {{obtainLevel(item.level)}}Vulnerability\">{{obtainLevel(item.level)}}</span></div></td>\n" +
+    "	<td  class=\"tdRowTechLevel\" ><div editable-select=\"item.level\" e-ng-options=\"s.value as s.label for s in levels\" buttons=\"no\"  onaftersave=\"updateLevels(item)\"><span class=\"bold {{obtainLevel(item.level)}}Vulnerability\">{{obtainLevel(item.level)}}</span></div></td>\n" +
     "</tr>\n" +
     "<tr class=\"openVulnerabilitiesRow\" ng-show=\"show\"><td colspan=\"5\">\n" +
     "<div class=\"row \">\n" +
@@ -153,7 +168,7 @@ angular.module("rowVulnTechnical.tpl.html", []).run(["$templateCache", function(
     "					<div class=\"item-form\"><span class=\"bold\">Vulnerability:</span><span class=\"editable editable-click\" editable-text=\"item.display_name\" buttons=\"no\" onaftersave=\"updateVulnerabilityType(item)\">{{item.display_name}}</span>&nbsp;(<span editable-text=\"item.data_subtype\" buttons=\"no\">{{item.data_subtype}}</span>) </div>\n" +
     "				</div>\n" +
     "				<div class=\"col-sm-4\">\n" +
-    "					<div class=\"item-form\"><span class=\"bold \">Criticality:</span><span class=\"{{obtainLevel(item.level)}}Vulnerability bold\" editable-select=\"item.level\" e-ng-options=\"s.value as s.label for s in levels\" buttons=\"no\"  onaftersave=\"updateLevels(item)\">{{obtainLevel(item.level)}}</span> </div>\n" +
+    "					<div class=\"item-form\"><span class=\"bold \">Criticality:</span><span class=\"{{obtainLevel(item.level)}}Vulnerability bold editable editable-click\" editable-select=\"item.level\" e-ng-options=\"s.value as s.label for s in levels\" buttons=\"no\"  onaftersave=\"updateLevels(item)\">{{obtainLevel(item.level)}}</span> </div>\n" +
     "				</div>\n" +
     "			</div>\n" +
     "			<div class=\"row\">\n" +

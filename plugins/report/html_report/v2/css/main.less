@@ -368,13 +368,13 @@ tr.targetRow, tr.resourceRow, tr.vulnerabilityRow,{
 		width: 30px;
 	}
 	.tdRowTechIdentity{
-		width:245px;
+		width:60px;
 	}
 	.tdRowTechTarget{
-		width:40%;
+		width:50%;
 	}
 	.tdRowTechVuln{
-		width: 60%;
+		width:50%;
 	}
 	.tdRowTechLevel{
 		width:80px;
@@ -483,7 +483,7 @@ select{
 }
 
 
-@import  "./newStyles.less";
+@import  "./styles_new_lookandfeel.less";
 
 @tabletLandscape:    ~"only screen and (max-width: 1024px)";
 @mobilePortrait:    ~"only screen and (max-width: 768px)";
@@ -503,16 +503,16 @@ select{
 			width: 4%;
 		}
 		.tdRowTechIdentity{
-			width:48%;
+			width:8%;
 		}
 		.tdRowTechTarget{
-			width:48%;
+			width:58%;
 		}
 		.tdRowTechVuln{
 			width: 0;
 		}
 		.tdRowTechLevel{
-			width:0;
+			width:30%;
 		}
 	}
 	.table-responsive>.table-bordered>thead>tr>th:first-child, .table-responsive>.table-bordered>tbody>tr>th:first-child, .table-responsive>.table-bordered>tfoot>tr>th:first-child, .table-responsive>.table-bordered>thead>tr>td:first-child, .table-responsive>.table-bordered>tbody>tr>td:first-child, .table-responsive>.table-bordered>tfoot>tr>td:first-child{
@@ -568,3 +568,10 @@ select{
 		display: none;
 	}
 }
+
+
+.editable-buttons{
+	display: block !important;
+}
+
+@import  "./xeditable.less";

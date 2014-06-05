@@ -217,7 +217,7 @@ angular.module('colorpicker.module', [])
             target = Helper.closestSlider(event.target),
             targetOffset = Helper.getOffset(target, fixedPosition);
           slider.knob = target.children[0].style;
-          slider.left = event.pageX - targetOffset.left - window.pageXOffset + targetOffset.scrollX;
+          slider.left = // event.pageX - targetOffset.left - window.pageXOffset + targetOffset.scrollX;
           slider.top = event.pageY - targetOffset.top - window.pageYOffset + targetOffset.scrollY;
 
           pointer = {
@@ -428,7 +428,9 @@ angular.module('colorpicker.module', [])
           var getColorpickerTemplatePosition = function() {
             var
                 positionValue,
-                positionOffset = Helper.getOffset(elem[0]);
+                positionOffset = $(elem[0]).offset();//MODIFICADO para que funcione bien en las modales
+
+                // Helper.getOffset(elem[0]);
 
             if(angular.isDefined(attrs.colorpickerParent)) {
               positionOffset.left = 0;
