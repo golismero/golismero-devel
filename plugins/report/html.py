@@ -227,7 +227,7 @@ class HTMLReport(json.JSONOutput):
         template = os.path.join(template, "template.html")
         with open(template, "rb") as fd:
             html = fd.read()
-        assert "%DATA%" in template, "Invalid template!"
+        assert "%DATA%" in html, "Invalid template!"
         html = html.replace("%DATA%", serialized_data)
         del serialized_data
         with open(output_file, "wb") as fd:
