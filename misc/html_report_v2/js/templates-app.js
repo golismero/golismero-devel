@@ -107,9 +107,12 @@ angular.module("custompdf.tpl.html", []).run(["$templateCache", function($templa
     "    				\n" +
     "    				<div class=\"dataStyleRow\">\n" +
     "    					<div>Align:</div>\n" +
-    "    					<select ng-model=\"value.alignment\">\n" +
+    "    					<select ng-model=\"value.alignment\"> \n" +
+    "    						<option value=\"\"></option>\n" +
     "	    					<option value=\"left\">left</option>\n" +
     "	    					<option value=\"right\">right</option>\n" +
+    "	    					<option value=\"centered\">centered</option>\n" +
+    "	    					<option value=\"justified\">justified</option>\n" +
     "	    				</select>\n" +
     "    				</div>\n" +
     "    				<div class=\"dataStyleRow\">\n" +

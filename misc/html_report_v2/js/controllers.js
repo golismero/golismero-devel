@@ -326,16 +326,6 @@ app.controller('reportController', ['$scope', 'dataAccess', 'pdfService', '$filt
 			      margin:[0, 17, 0, 0],
 			      description:"Style that sets the title of report"
 			    },
-			    headerPage:{
-			    	alignment:'right',
-			    	margin:[10, 10, 10 , 10 ],
-			      description:"Style that sets the text of header"
-			    },
-			    footerPage:{
-			    	aligment:'right',
-			    	margin:[10, 10, 10 , 10 ],
-			      description:"Style that sets the text of footer"
-			    },
 			    h2: {
 			      fontSize: 18,
 			      bold: true,
@@ -365,9 +355,19 @@ app.controller('reportController', ['$scope', 'dataAccess', 'pdfService', '$filt
 			    	color:'#b40a9d',
 			     	description:"Style that sets the text of criticality 'Critical'"
 			    },			   
-			    text:{
+			    otherText:{
 			    	fontSize:10,
 			     	description:"Style that sets the other texts (not titles, headers, etc)"
+			    },			    
+			    headerPage : {
+			    	alignment:'right',
+			    	margin:10,
+			    	description:"Style that sets the text of header"
+			    },
+			    footerPage: {
+			    	alignment:"right",
+			    	margin:10,
+			    	description:"Style that sets the text of footer"			    	
 			    }
 			}
 		}

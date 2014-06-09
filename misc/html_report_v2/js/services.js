@@ -287,35 +287,35 @@ angular.module('golismero-report-services', [])
 		if(generalInfo.summary.showTargets){
 			summaryjson.table.widths.push('*');
 			summaryjson.table.body[0].push({ text: 'Targets', style:'th' });
-			summaryjson.table.body[1].push({text:targets, style:'text'});
+			summaryjson.table.body[1].push({text:targets, style:'otherText'});
 		}
 		if(generalInfo.summary.showTimes){
 			summaryjson.table.widths.push('*');
 			summaryjson.table.body[0].push({ text: 'Time', style:'th' });
 			summaryjson.table.body[1].push([
-		                      	{ text: 'Start:', style:'h3' },{text:summary.start_time, style:'text'},
-		                      	{ text: 'End:', style:'h3' },{text:summary.stop_time, style:'text'},
-		                      	{ text: 'Total:', style:'h3' },{text:summary.run_time, style:'text'}
+		                      	{ text: 'Start:', style:'h3' },{text:summary.start_time, style:'otherText'},
+		                      	{ text: 'End:', style:'h3' },{text:summary.stop_time, style:'otherText'},
+		                      	{ text: 'Total:', style:'h3' },{text:summary.run_time, style:'otherText'}
 	                      	]);
 		}
 		if(generalInfo.summary.showTotals){
 			summaryjson.table.widths.push('*');
 			summaryjson.table.body[0].push( { text: 'Vulnerabilities summary', style:'th' });
 			/*summaryjson.table.body[1].push([
-		                      	{ text: 'Total:', style:'h3' },{text:(stats.High + stats.Low + stats.Middle + stats.Critical + stats.Informational)+'', style:'text'},
+		                      	{ text: 'Total:', style:'h3' },{text:(stats.High + stats.Low + stats.Middle + stats.Critical + stats.Informational)+'', style:'otherText'},
 		                      	{
 		                      		columns:[
-		                      			[{ text: 'Critical:', style:['h3', 'critical'] },{text:stats.Critical.toString(), style:'text'}], 
-			                    		[{ text: 'High:', style:['h3', 'high'] },{text:stats.High.toString(), style:'text'}]
+		                      			[{ text: 'Critical:', style:['h3', 'critical'] },{text:stats.Critical.toString(), style:'otherText'}], 
+			                    		[{ text: 'High:', style:['h3', 'high'] },{text:stats.High.toString(), style:'otherText'}]
 		                      		]
 		                      	},
 		                      	{
 		                      		columns:[
-		                      			[{ text: 'Middle:', style:['h3', 'middle'] },{text:stats.Middle.toString(), style:'text'}], 
-			                    		[{ text: 'Low:', style:['h3', 'low'] },{text:stats.Low.toString(), style:'text'}]
+		                      			[{ text: 'Middle:', style:['h3', 'middle'] },{text:stats.Middle.toString(), style:'otherText'}], 
+			                    		[{ text: 'Low:', style:['h3', 'low'] },{text:stats.Low.toString(), style:'otherText'}]
 		                      		]
 		                      	},			                    
-			                    { text: 'Informational:', style:['h3', 'informational']},{text:stats.Informational.toString(), style:'text'}
+			                    { text: 'Informational:', style:['h3', 'informational']},{text:stats.Informational.toString(), style:'otherText'}
 		                    ]);
 			*/
 			summaryjson.table.body[1].push({table: {
@@ -324,12 +324,12 @@ angular.module('golismero-report-services', [])
 
 		        body: [
 		          [ { text: 'Level:', style:'h3' }, { text: 'Number:', style:'h3' }],
-		          [ { text: 'Critical:', style:['h3', 'critical'] }, {text:stats.Critical.toString(), style:'text'} ],
-		          [ { text: 'High:', style:['h3', 'high'] }, {text:stats.High.toString(), style:'text'} ],
-		          [ { text: 'Middle:', style:['h3', 'middle'] }, {text:stats.Middle.toString(), style:'text'} ],
-		          [ { text: 'Low:', style:['h3', 'low'] }, {text:stats.Low.toString(), style:'text'} ],
-		          [ { text: 'Informational:', style:['h3', 'informational']}, {text:stats.Informational.toString(), style:'text'}],
-		          [ { text: 'Total:', style:'h3' }, {text:(stats.High + stats.Low + stats.Middle + stats.Critical + stats.Informational)+'', style:'text'}],
+		          [ { text: 'Critical:', style:['h3', 'critical'] }, {text:stats.Critical.toString(), style:'otherText'} ],
+		          [ { text: 'High:', style:['h3', 'high'] }, {text:stats.High.toString(), style:'otherText'} ],
+		          [ { text: 'Middle:', style:['h3', 'middle'] }, {text:stats.Middle.toString(), style:'otherText'} ],
+		          [ { text: 'Low:', style:['h3', 'low'] }, {text:stats.Low.toString(), style:'otherText'} ],
+		          [ { text: 'Informational:', style:['h3', 'informational']}, {text:stats.Informational.toString(), style:'otherText'}],
+		          [ { text: 'Total:', style:'h3' }, {text:(stats.High + stats.Low + stats.Middle + stats.Critical + stats.Informational)+'', style:'otherText'}],
 		        ]
 		      }});
 		}
@@ -380,9 +380,9 @@ angular.module('golismero-report-services', [])
 		var rows = [[ { text: 'ID', style:'th' }, { text: 'Target', style:'th' }, { text: 'Vulnerability', style:'th' }, { text: 'Criticality', style:'th' } ]];
 		for(var i in vulns){
 			var obj = [
-				{text:vulns[i].nameIdentity, style:'text'},
-				{text:vulns[i].resource, style:'text'},
-				{text:vulns[i].display_name, style:'text'},
+				{text:vulns[i].nameIdentity, style:'otherText'},
+				{text:vulns[i].resource, style:'otherText'},
+				{text:vulns[i].display_name, style:'otherText'},
 				obtainLevel(vulns[i].level)
 			];
 			rows.push(obj);
@@ -412,17 +412,17 @@ angular.module('golismero-report-services', [])
 				    widths: [ 'auto', '*', '*', "auto" ],
 				    body:[
 				    	[ { text: 'ID', style:"th" }, { text: 'Target', style:"th" }, { text: 'Vulnerability', style:"th" }, { text: 'Criticality',style:"th" } ],
-				    	[{text:item.nameIdentity, style:'text'},{text:item.resource, style:'text'},{text:item.display_name, style:'text'},obtainLevel(item.level)]
+				    	[{text:item.nameIdentity, style:'otherText'},{text:item.resource, style:'otherText'},{text:item.display_name, style:'otherText'},obtainLevel(item.level)]
 				    ]
 				}	
 			};
 			var taxonomy = [{ text: 'Taxonomy:', bold: true }];
 			for(var i in item.taxonomy){
-				taxonomy.push({text:item.taxonomy[i], style:'text'});
+				taxonomy.push({text:item.taxonomy[i], style:'otherText'});
 			}
 			var references = [{ text: 'References:', bold: true }];
 			for(var i in item.references){
-				references.push({text:item.references[i], style: 'text'});
+				references.push({text:item.references[i], style:'otherText'});
 			}
 			var tableDetail = {
 				table:{
@@ -491,18 +491,19 @@ angular.module('golismero-report-services', [])
 				' ',
 			],
 
-		  	styles: generalInfo.styles
+		  	styles:generalInfo.styles
 		};
+	
 		if(generalInfo.enabledHeader){
 			dd.header = function(currentPage, pageCount) {
 				var result = generalInfo.templateHeader.replace("%currentPage%", currentPage).replace("%totalPages%", pageCount);
-				return { text: result, style:  'headerPage' };
+				return { text: result,  style:'headerPage' };
 			}
 		}
 		if(generalInfo.enabledFooter){
 			dd.footer = function(currentPage, pageCount) {
 				var result = generalInfo.templateFooter.replace("%currentPage%", currentPage).replace("%totalPages%", pageCount);
-				return { text: result, style:  'footerPage' };
+				return { text: result,  style:'footerPage' };
 			}
 		}
 		if(generalInfo.summary.showSummary){

@@ -217,7 +217,7 @@ angular.module('colorpicker.module', [])
             target = Helper.closestSlider(event.target),
             targetOffset = Helper.getOffset(target, fixedPosition);
           slider.knob = target.children[0].style;
-          slider.left = // event.pageX - targetOffset.left - window.pageXOffset + targetOffset.scrollX;
+          slider.left =  event.pageX - targetOffset.left - window.pageXOffset + targetOffset.scrollX;
           slider.top = event.pageY - targetOffset.top - window.pageYOffset + targetOffset.scrollY;
 
           pointer = {
