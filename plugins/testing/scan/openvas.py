@@ -43,6 +43,9 @@ except ImportError:
 from openvas_lib import VulnscanManager, VulnscanException, VulnscanVersionError, VulnscanAuditNotFoundError
 from openvas_lib.data import OpenVASResult
 
+from golismero.api.data import vulnerability
+from golismero.api.data.vulnerability import Vulnerability, \
+    UncategorizedVulnerability  # noqa
 from golismero.api.logger import Logger
 from golismero.api.config import Config
 from golismero.api.data.db import Database
@@ -51,12 +54,6 @@ from golismero.api.data.resource.domain import Domain
 from golismero.api.net.web_utils import parse_url
 from golismero.api.plugin import TestingPlugin, ImportPlugin
 
-from golismero.api.data.vulnerability import UncategorizedVulnerability, Vulnerability  #noqa
-from golismero.api.data.vulnerability.infrastructure.outdated_platform import * # noqa
-from golismero.api.data.vulnerability.infrastructure.outdated_software import * # noqa
-from golismero.api.data.vulnerability.information_disclosure.insecure_method import * # noqa
-from golismero.api.data.vulnerability.malware import * # noqa
-
 
 #------------------------------------------------------------------------------
 # OpenVAS plugin extra files.
@@ -64,6 +61,46 @@ base_dir = os.path.split(os.path.abspath(__file__))[0]
 openvas_dir = os.path.join(base_dir, "openvas_plugin")
 openvas_db = os.path.join(openvas_dir, "openvas.db")
 del base_dir
+
+
+#------------------------------------------------------------------------------
+# Helper function to load all vulnerability types.
+def load_vulnerability_types():
+    data_types = []
+
+    # Look for Python files in golismero/api/data.
+    api_data = os.path.dirname(vulnerability.__file__)
+    api_data = os.path.abspath(api_data)
+    for root, folders, files in os.walk(api_data):
+        for name in files:
+            if name.startswith("_") or not name.endswith(".py"):
+                continue
+
+            # Get the module name from its file path.
+            name = name[:-3]
+            name = os.path.join(root, name)
+            name = os.path.abspath(name)
+            name = name[len(api_data):]
+            if name.startswith(os.path.sep):
+                name = name[1:]
+            name = name.replace(os.path.sep, ".")
+            name = "golismero.api.data.vulnerability." + name
+
+            # Load the module and extract all its data types.
+            module = __import__(name, globals(), locals(), ['*'])
+            for name in dir(module):
+                if name.startswith("_") or name == "Vulnerability":
+                    continue
+                clazz = getattr(module, name)
+                if isinstance(clazz, type) and \
+                        issubclass(clazz, Vulnerability) and \
+                                clazz not in data_types:
+                    data_types.append(clazz)
+                    globals()[name] = clazz
+
+    return data_types
+
+load_vulnerability_types()
 
 
 #------------------------------------------------------------------------------
@@ -391,7 +428,7 @@ class OpenVASPlugin(TestingPlugin):
                     cve.remove("NOBID")
 
                 # Extract the notes and add them to the description text.
-                if opv.notes:
+                if opv.notes and description is not None:
                     description += "\n" + "\n".join(
                         " - " + note.text
                         for note in opv.notes
@@ -399,25 +436,26 @@ class OpenVASPlugin(TestingPlugin):
 
                 # Extract the reference URLs from the description text.
                 references = []
-                p = description.find("URL:")
-                while p >= 0:
-                    p += 4
-                    q2 = description.find("\n", p)
-                    q1 = description.find(",", p, q2)
-                    if q1 > p:
-                        q = q1
-                    else:
-                        q = q2
-                    if q < p:
-                        q = len(description)
-                    url = description[p:q].strip()
-                    try:
-                        url = parse_url(url).url
-                        references.append(url)
-                    except Exception:
-                        Logger.log_error(format_exc())
-                        pass
-                    p = description.find("URL:", q)
+                if description is not None:
+                    p = description.find("URL:")
+                    while p >= 0:
+                        p += 4
+                        q2 = description.find("\n", p)
+                        q1 = description.find(",", p, q2)
+                        if q1 > p:
+                            q = q1
+                        else:
+                            q = q2
+                        if q < p:
+                            q = len(description)
+                        url = description[p:q].strip()
+                        try:
+                            url = parse_url(url).url
+                            references.append(url)
+                        except Exception:
+                            Logger.log_error(format_exc())
+                            pass
+                        p = description.find("URL:", q)
 
                 # Prepare the vulnerability properties.
                 kwargs = {
@@ -444,8 +482,15 @@ class OpenVASPlugin(TestingPlugin):
                     classname = use_openvas_db[oid][0][0]
 
                 # Create the Vulnerability object.
-                clazz = globals()[classname]
-                vuln  = clazz(target, **kwargs)
+                try:
+                    clazz = globals()[classname]
+                    vuln  = clazz(target, **kwargs)
+                except Exception, e:
+                    t = format_exc()
+                    Logger.log_error_more_verbose(
+                        "Could not load vulnerability of type: %s" % classname)
+                    Logger.log_error_more_verbose(t)
+                    vuln = UncategorizedVulnerability(target, **kwargs)
                 results.append(vuln)
 
             # Skip this result on error.
