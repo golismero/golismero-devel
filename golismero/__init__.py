@@ -44,7 +44,7 @@ __author__     = "GoLismero project team"
 __copyright__  = "Copyright (C) 2011-2014 GoLismero Project"
 __credits__    = ["GoLismero Project Team"]
 __email__      = "contact@golismero-project.com"
-__version__    = "2.0.0b5"
+__version__    = "2.0.0b6"
 
 
 #------------------------------------------------------------------------------
@@ -54,7 +54,7 @@ def get_banner():
     :rtype: str
     """
     banner_lines = [
-        "GoLismero %s, The Web Knife - RootedCON Edition" % __version__,
+        "GoLismero %s, The Web Knife" % __version__,
         __copyright__,
         "",
         "Contact: " + __email__,
