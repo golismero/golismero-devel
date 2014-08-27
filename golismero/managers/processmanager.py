@@ -1218,6 +1218,7 @@ class ProcessManager (object):
 
         # Otherwise just call the plugin directly.
         old_context = Config._context
+        context._orchestrator_address = self.__orchestrator_address
         try:
             return bootstrap(context, func, args, kwargs)
         finally:
