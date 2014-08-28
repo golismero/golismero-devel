@@ -206,7 +206,9 @@ class HTMLReport(json.JSONOutput):
         # actual report shows them to the user as strings, but sorts
         # using the integer values.
         for vuln in report_data["vulnerabilities"]:
-            vuln["level"] = Vulnerability.VULN_LEVELS.index(vuln["level"])
+            vuln["level"] = Vulnerability.VULN_LEVELS.index(
+                vuln["level"].strip().lower()
+            )
 
         # Generate the ZIP file comment.
         comment = "Report generated with GoLismero %s at %s UTC\n"\
