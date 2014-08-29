@@ -103,9 +103,9 @@ class HTMLReport(json.JSONOutput):
         # Also, delete all properties we know aren't being used in the report.
         vulnerabilities = report_data["vulnerabilities"]
         sort_keys = [
-            (data["display_name"],
-             data["plugin_id"],
-             data["target_id"],
+            (data.get("display_name", "Vulnerability"),
+             data.get("plugin_id", "GoLismero"),
+             data.get("target_id", None),  # FIXME this should never happen!
              data["identity"])
             for data in vulnerabilities.itervalues()
         ]
