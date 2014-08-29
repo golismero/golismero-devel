@@ -61,6 +61,7 @@ m_colors = {
     # String log levels to color names.
     'informational' : 'blue',
     'low'           : 'cyan',
+    'medium'        : None,
     'middle'        : None,
     'high'          : 'magenta',
     'critical'      : 'red',
