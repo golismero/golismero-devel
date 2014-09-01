@@ -458,7 +458,7 @@ class SharedMap (AbstractSharedContainer):
         :param value: Value to map.
         :type value: immutable
         """
-        self.async_put_many( (key, value) )
+        self.async_put_many( ( (key, value), ) )
 
 
     #--------------------------------------------------------------------------
