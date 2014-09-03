@@ -98,8 +98,8 @@ class NmapScanPlugin(TestingPlugin):
         # "ftp-bounce",                             # needs a vuln class
         "ftp-libopie",
         "ftp-proftpd-backdoor",
-        # "ftp-vsftpd-backdoor",
-        # "ftp-vuln-cve2010-4221",
+        "ftp-vsftpd-backdoor",
+        "ftp-vuln-cve2010-4221",
         # "hadoop-datanode-info",
         # "hadoop-jobtracker-info",
         # "hadoop-namenode-info",
@@ -877,3 +877,61 @@ class NmapScanPlugin(TestingPlugin):
                 "server (see OSVDB ID: 69562)."
                 "\n\nNSE Script output:\n" + output)
             )]
+
+    @classmethod
+    def parse_ftp_vsftpd_backdoor(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the ftp-vsftpd-backdoor NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the real port number instead of the default
+        if "VULNERABLE:" in output:
+            vuln = VulnerableService(vuln_ip, 21, "TCP",
+                                     **extract_vuln_ids(output))
+            vuln.description += "\n\nNSE Script output:\n" + output
+            return [vuln]
+
+    @classmethod
+    def parse_ftp_vuln_cve2010_4221(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the ftp-vuln-cve2010-4221 NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the real port number instead of the default
+        if "VULNERABLE:" in output:
+            vuln = VulnerableService(vuln_ip, 21, "TCP",
+                                     **extract_vuln_ids(output))
+            vuln.description += "\n\nNSE Script output:\n" + output
+            return [vuln]
