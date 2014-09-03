@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from golismero.api.data.vulnerability.vuln_utils import extract_vuln_ids
 
 __license__ = """
 GoLismero 2.0 - The web knife - Copyright (C) 2011-2014
@@ -32,7 +31,9 @@ from golismero.api.data.resource.domain import Domain
 from golismero.api.data.resource.ip import IP
 from golismero.api.data.resource.mac import MAC
 from golismero.api.data.vulnerability.infrastructure.vulnerable_service import VulnerableService
+from golismero.api.data.vulnerability.malware.backdoor import Backdoor
 from golismero.api.data.vulnerability.malware.malicious import MaliciousIP
+from golismero.api.data.vulnerability.vuln_utils import extract_vuln_ids
 from golismero.api.external import run_external_tool, tempfile, find_binary_in_path
 from golismero.api.logger import Logger
 from golismero.api.net import ConnectionSlot
@@ -86,17 +87,17 @@ class NmapScanPlugin(TestingPlugin):
         "dns-random-srcport",
         "dns-random-txid",
         "dns-recursion",
-        # "dns-service-discovery",
-        # "dns-srv-enum",
-        # "dns-update",
-        # "dns-zeustracker",
-        # "domino-enum-users",
-        # "fcrdns",
-        # "finger",
-        # "ftp-anon",
-        # "ftp-bounce",
-        # "ftp-libopie",
-        # "ftp-proftpd-backdoor",
+        # "dns-service-discovery",                  # needs a vuln class
+        # "dns-srv-enum",                           # needs a vuln class
+        # "dns-update",                             # needs a vuln class
+        "dns-zeustracker",
+        "domino-enum-users",
+        # "fcrdns",                                 # complex to parse
+        # "finger",                                 # undocumented output
+        # "ftp-anon",                               # complex to parse
+        # "ftp-bounce",                             # needs a vuln class
+        "ftp-libopie",
+        "ftp-proftpd-backdoor",
         # "ftp-vsftpd-backdoor",
         # "ftp-vuln-cve2010-4221",
         # "hadoop-datanode-info",
@@ -112,7 +113,7 @@ class NmapScanPlugin(TestingPlugin):
         # "http-drupal-enum-users",
         # "http-frontpage-login",
         # "http-git",
-        # #"http-google-malware", # requires API key
+        # "http-google-malware",                    # requires API key
         # "http-iis-short-name-brute",
         # "http-iis-webdav-vuln",
         # "http-litespeed-sourcecode-download",
@@ -621,7 +622,7 @@ class NmapScanPlugin(TestingPlugin):
         if "VULNERABLE:" in output:
             vuln = VulnerableService(vuln_ip, 548, "TCP",
                                      **extract_vuln_ids(output))
-            vuln.description += "\nNSE Script output:\n" + output
+            vuln.description += "\n\nNSE Script output:\n" + output
             return [vuln]
 
     @classmethod
@@ -649,7 +650,7 @@ class NmapScanPlugin(TestingPlugin):
         for line in output.split("\n"):
             if line.endswith(" - PROXY") or line.endswith(" - SPAM"):
                 vuln = MaliciousIP(vuln_ip)
-                vuln.description += "\nNSE Script output:\n" + output
+                vuln.description += "\n\nNSE Script output:\n" + output
                 return [vuln]
 
     @classmethod
@@ -753,4 +754,126 @@ class NmapScanPlugin(TestingPlugin):
                 "A DNS server was found to have recursion enabled, "
                 "which can make a DNS server vulnerable to cache poisoning "
                 "attacks (see CVE-2008-1447).\n\nNSE Script output:\n" + output)
+            )]
+
+    @classmethod
+    def parse_dns_zeustracker(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the dns-zeustracker NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return [MaliciousIP(
+            vuln_ip,
+            description = (
+            "One or more IP addresses in the same block have been found "
+            "to be part of a Zeus botnet.\n\nNSE Script output:\n" + output)
+        )]
+
+    @classmethod
+    def parse_domino_enum_users(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the domino-enum-users NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the real port number instead of the default
+        # TODO get the dumped usernames and IDs
+        vuln = VulnerableService(vuln_ip, 1352, "TCP",
+                                 cve = ["CVE-2006-5835"])
+        vuln.description += "\n\nNSE Script output:\n" + output
+        return [vuln]
+
+    @classmethod
+    def parse_ftp_libopie(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the ftp-libopie NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the real port number instead of the default
+        # TODO extract the proper description string instead of appending.
+        if "VULNERABLE:" in output:
+            vuln = VulnerableService(vuln_ip, 21, "TCP",
+                                     **extract_vuln_ids(output))
+            vuln.description += "\n\nNSE Script output:\n" + output
+            return [vuln]
+
+    @classmethod
+    def parse_ftp_proftpd_backdoor(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the ftp-proftpd-backdoor NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the real port number instead of the default
+        if "This installation has been backdoored." in output:
+            return [Backdoor(
+                vuln_ip, 21, "TCP",
+                osvdb = ["OSBDV-69562"],
+                description = (
+                "A ProFTPD 1.3.3c server was found. This version is "
+                "backdoored, allowing any user to take control of the "
+                "server (see OSVDB ID: 69562)."
+                "\n\nNSE Script output:\n" + output)
             )]
