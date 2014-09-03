@@ -30,6 +30,7 @@ from golismero.api.data.information.traceroute import Traceroute, Hop
 from golismero.api.data.resource.domain import Domain
 from golismero.api.data.resource.ip import IP
 from golismero.api.data.resource.mac import MAC
+from golismero.api.data.vulnerability.infrastructure.vulnerable_service import VulnerableService
 from golismero.api.data.vulnerability.malware.malicious import MaliciousIP
 from golismero.api.external import run_external_tool, tempfile, find_binary_in_path
 from golismero.api.logger import Logger
@@ -38,7 +39,6 @@ from golismero.api.plugin import ImportPlugin, TestingPlugin
 
 import shlex
 
-from os.path import exists, getsize
 from socket import getservbyname
 from time import time
 from traceback import format_exc
@@ -566,6 +566,35 @@ class NmapScanPlugin(TestingPlugin):
         return results
 
     @classmethod
+    def parse_afp_path_vuln(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the afp-path-vuln NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the real port number instead of the default
+        # TODO extract the proper description string instead of appending.
+        if "VULNERABLE:" in output:
+            vuln = VulnerableService(vuln_ip, 548, "TCP")
+            vuln.description += "\nNSE Script output:\n" + output
+            return [vuln]
+
+    @classmethod
     def parse_dns_blacklist(cls, output, vuln_ip, host, hostmap):
         """
         Parse the output of the dns-blacklist NSE script.
@@ -587,21 +616,6 @@ class NmapScanPlugin(TestingPlugin):
         :returns: Results from the Nmap scan for this host.
         :rtype: list(Data)
         """
-#         output = """
-#   PROXY
-#     dnsbl.ahbl.org - PROXY
-#     dnsbl.tornevall.org - PROXY
-#       IP marked as "abusive host".
-#       Proxy is working
-#       Proxy has been scanned
-#   SPAM
-#     dnsbl.inps.de - SPAM
-#       Spam Received See: http://www.sorbs.net/lookup.shtml?1.2.3.4
-#     l2.apews.org - SPAM
-#     list.quorum.to - SPAM
-#     bl.spamcop.net - SPAM
-#     spam.dnsbl.sorbs.net - SPAM
-# """
         for line in output.split("\n"):
             if line.endswith(" - PROXY") or line.endswith(" - SPAM"):
                 vuln = MaliciousIP(vuln_ip)
