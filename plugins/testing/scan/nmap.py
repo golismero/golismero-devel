@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from golismero.api.data.vulnerability.vuln_utils import extract_vuln_ids
 
 __license__ = """
 GoLismero 2.0 - The web knife - Copyright (C) 2011-2014
@@ -81,92 +82,92 @@ class NmapScanPlugin(TestingPlugin):
     # installed version of Nmap, and run only those.
     SCRIPTS = (
         "afp-path-vuln",
-        "cvs-brute-repository",
-        "dns-blacklist",
-        "dns-random-srcport",
-        "dns-random-txid",
-        "dns-recursion",
-        "dns-service-discovery",
-        "dns-srv-enum",
-        "dns-update",
-        "dns-zeustracker",
-        "domino-enum-users",
-        "fcrdns",
-        "finger",
-        "ftp-anon",
-        "ftp-bounce",
-        "ftp-libopie",
-        "ftp-proftpd-backdoor",
-        "ftp-vsftpd-backdoor",
-        "ftp-vuln-cve2010-4221",
-        "hadoop-datanode-info",
-        "hadoop-jobtracker-info",
-        "hadoop-namenode-info",
-        "hadoop-secondary-namenode-info",
-        "hadoop-tasktracker-info",
-        "http-adobe-coldfusion-apsa1301",
-        "http-awstatstotals-exec",
-        "http-axis2-dir-traversal",
-        "http-barracuda-dir-traversal",
-        "http-coldfusion-subzero",
-        "http-drupal-enum-users",
-        "http-frontpage-login",
-        "http-git",
-        #"http-google-malware", # requires API key
-        "http-iis-short-name-brute",
-        "http-iis-webdav-vuln",
-        "http-litespeed-sourcecode-download",
-        "http-majordomo2-dir-traversal",
-        "http-malware-host",
-        "http-method-tamper",
-        "http-open-proxy",
-        "http-phpmyadmin-dir-traversal",
-        "http-slowloris-check",
-        "http-userdir-enum",
-        "http-vmware-path-vuln",
-        "http-virustotal",
-        "http-vuln-cve2006-3392",
-        "http-vuln-cve2009-3960",
-        "http-vuln-cve2010-0738",
-        "http-vuln-cve2010-2861",
-        "http-vuln-cve2011-3192",
-        "http-vuln-cve2011-3368",
-        "http-vuln-cve2012-1823",
-        "http-vuln-cve2013-0156",
-        "http-vuln-cve2013-7091",
-        "http-vuln-cve2014-2128",
-        "http-xssed",
-        "http-wordpress-enum",
-        "irc-unrealircd-backdoor",
-        "jdwp-version",
-        "maxdb-info",
-        "ms-sql-dac",
-        "ms-sql-empty-password",
-        "mysql-empty-password",
-        "mysql-enum",
-        "mysql-vuln-cve2012-2122",
-        "oracle-enum-users",
-        "p2p-conficker",
-        "qconn-exec",
-        "quake1-info",
-        "rdp-enum-encryption",
-        "rdp-vuln-ms12-020",
-        "realvnc-auth-bypass",
-        "rmi-vuln-classloader",
-        "samba-vuln-cve-2012-1182",
-        "smb-vuln-ms10-061",
-        "smtp-open-relay",
-        "socks-open-proxy",
-        "sshv1",
-        "ssl-ccs-injection",
-        "ssl-known-key",
-        "sslv2",
-        "stuxnet-detect",
-        "teamspeak2-version",
-        "tftp-enum",
-        "vnc-info",
-        "vuze-dht-info",
-        "x11-access",
+        # "cvs-brute-repository",
+        # "dns-blacklist",
+        # "dns-random-srcport",
+        # "dns-random-txid",
+        # "dns-recursion",
+        # "dns-service-discovery",
+        # "dns-srv-enum",
+        # "dns-update",
+        # "dns-zeustracker",
+        # "domino-enum-users",
+        # "fcrdns",
+        # "finger",
+        # "ftp-anon",
+        # "ftp-bounce",
+        # "ftp-libopie",
+        # "ftp-proftpd-backdoor",
+        # "ftp-vsftpd-backdoor",
+        # "ftp-vuln-cve2010-4221",
+        # "hadoop-datanode-info",
+        # "hadoop-jobtracker-info",
+        # "hadoop-namenode-info",
+        # "hadoop-secondary-namenode-info",
+        # "hadoop-tasktracker-info",
+        # "http-adobe-coldfusion-apsa1301",
+        # "http-awstatstotals-exec",
+        # "http-axis2-dir-traversal",
+        # "http-barracuda-dir-traversal",
+        # "http-coldfusion-subzero",
+        # "http-drupal-enum-users",
+        # "http-frontpage-login",
+        # "http-git",
+        # #"http-google-malware", # requires API key
+        # "http-iis-short-name-brute",
+        # "http-iis-webdav-vuln",
+        # "http-litespeed-sourcecode-download",
+        # "http-majordomo2-dir-traversal",
+        # "http-malware-host",
+        # "http-method-tamper",
+        # "http-open-proxy",
+        # "http-phpmyadmin-dir-traversal",
+        # "http-slowloris-check",
+        # "http-userdir-enum",
+        # "http-vmware-path-vuln",
+        # "http-virustotal",
+        # "http-vuln-cve2006-3392",
+        # "http-vuln-cve2009-3960",
+        # "http-vuln-cve2010-0738",
+        # "http-vuln-cve2010-2861",
+        # "http-vuln-cve2011-3192",
+        # "http-vuln-cve2011-3368",
+        # "http-vuln-cve2012-1823",
+        # "http-vuln-cve2013-0156",
+        # "http-vuln-cve2013-7091",
+        # "http-vuln-cve2014-2128",
+        # "http-xssed",
+        # "http-wordpress-enum",
+        # "irc-unrealircd-backdoor",
+        # "jdwp-version",
+        # "maxdb-info",
+        # "ms-sql-dac",
+        # "ms-sql-empty-password",
+        # "mysql-empty-password",
+        # "mysql-enum",
+        # "mysql-vuln-cve2012-2122",
+        # "oracle-enum-users",
+        # "p2p-conficker",
+        # "qconn-exec",
+        # "quake1-info",
+        # "rdp-enum-encryption",
+        # "rdp-vuln-ms12-020",
+        # "realvnc-auth-bypass",
+        # "rmi-vuln-classloader",
+        # "samba-vuln-cve-2012-1182",
+        # "smb-vuln-ms10-061",
+        # "smtp-open-relay",
+        # "socks-open-proxy",
+        # "sshv1",
+        # "ssl-ccs-injection",
+        # "ssl-known-key",
+        # "sslv2",
+        # "stuxnet-detect",
+        # "teamspeak2-version",
+        # "tftp-enum",
+        # "vnc-info",
+        # "vuze-dht-info",
+        # "x11-access",
     )
 
 
@@ -544,6 +545,32 @@ class NmapScanPlugin(TestingPlugin):
 
         # Parse the NSE script results.
         if vuln_ip is not None:
+
+#             # XXX DEBUG
+#             output = """
+# VULNERABLE:
+#   Apple Mac OS X AFP server directory traversal
+#     State: VULNERABLE (Exploitable)
+#     IDs:  CVE:CVE-2010-0533
+#     Risk factor: High  CVSSv2: 7.5 (HIGH) (AV:N/AC:L/Au:N/C:P/I:P/A:P)
+#     Description:
+#       Directory traversal vulnerability in AFP Server in Apple Mac OS X before
+#       10.6.3 allows remote attackers to list a share root's parent directory.
+#     Disclosure date: 2010-03-29
+#     Exploit results:
+#       Patrik Karlsson's Public Folder/../ (5 first items)
+#       .bash_history
+#       .bash_profile
+#       .CFUserTextEncoding
+#       .config/
+#       .crash_report_checksum
+#     References:
+#       http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2010-0533
+#       http://support.apple.com/kb/HT1222
+#       http://www.cqure.net/wp/2010/03/detecting-apple-mac-os-x-afp-vulnerability-cve-2010-0533-with-nmap
+# """
+#             r = cls.parse_afp_path_vuln(output, vuln_ip, host, hostmap)
+
             for node in host.findall(".//hostscript"):
                 for node in node.findall(".//script"):
                     try:
@@ -590,7 +617,8 @@ class NmapScanPlugin(TestingPlugin):
         # TODO get the real port number instead of the default
         # TODO extract the proper description string instead of appending.
         if "VULNERABLE:" in output:
-            vuln = VulnerableService(vuln_ip, 548, "TCP")
+            vuln = VulnerableService(vuln_ip, 548, "TCP",
+                                     **extract_vuln_ids(output))
             vuln.description += "\nNSE Script output:\n" + output
             return [vuln]
 
