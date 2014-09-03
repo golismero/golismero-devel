@@ -30,6 +30,7 @@ from golismero.api.data.information.traceroute import Traceroute, Hop
 from golismero.api.data.resource.domain import Domain
 from golismero.api.data.resource.ip import IP
 from golismero.api.data.resource.mac import MAC
+from golismero.api.data.vulnerability.malware.malicious import MaliciousIP
 from golismero.api.external import run_external_tool, tempfile, find_binary_in_path
 from golismero.api.logger import Logger
 from golismero.api.net import ConnectionSlot
@@ -37,6 +38,7 @@ from golismero.api.plugin import ImportPlugin, TestingPlugin
 
 import shlex
 
+from os.path import exists, getsize
 from socket import getservbyname
 from time import time
 from traceback import format_exc
@@ -56,7 +58,7 @@ class NmapImportPlugin(ImportPlugin):
     def is_supported(self, input_file):
         if input_file and input_file.lower().endswith(".xml"):
             with open(input_file, "rU") as fd:
-                return "<nmaprun " in fd.read(1024)
+                return "<nmaprun " in fd.read(10240)
         return False
 
 
@@ -74,6 +76,99 @@ class NmapImportPlugin(ImportPlugin):
 #------------------------------------------------------------------------------
 class NmapScanPlugin(TestingPlugin):
 
+    # List of supported NSE scripts.
+    # The plugin will attempt to find which ones exist in the locally
+    # installed version of Nmap, and run only those.
+    SCRIPTS = (
+        "afp-path-vuln",
+        "cvs-brute-repository",
+        "dns-blacklist",
+        "dns-random-srcport",
+        "dns-random-txid",
+        "dns-recursion",
+        "dns-service-discovery",
+        "dns-srv-enum",
+        "dns-update",
+        "dns-zeustracker",
+        "domino-enum-users",
+        "fcrdns",
+        "finger",
+        "ftp-anon",
+        "ftp-bounce",
+        "ftp-libopie",
+        "ftp-proftpd-backdoor",
+        "ftp-vsftpd-backdoor",
+        "ftp-vuln-cve2010-4221",
+        "hadoop-datanode-info",
+        "hadoop-jobtracker-info",
+        "hadoop-namenode-info",
+        "hadoop-secondary-namenode-info",
+        "hadoop-tasktracker-info",
+        "http-adobe-coldfusion-apsa1301",
+        "http-awstatstotals-exec",
+        "http-axis2-dir-traversal",
+        "http-barracuda-dir-traversal",
+        "http-coldfusion-subzero",
+        "http-drupal-enum-users",
+        "http-frontpage-login",
+        "http-git",
+        #"http-google-malware", # requires API key
+        "http-iis-short-name-brute",
+        "http-iis-webdav-vuln",
+        "http-litespeed-sourcecode-download",
+        "http-majordomo2-dir-traversal",
+        "http-malware-host",
+        "http-method-tamper",
+        "http-open-proxy",
+        "http-phpmyadmin-dir-traversal",
+        "http-slowloris-check",
+        "http-userdir-enum",
+        "http-vmware-path-vuln",
+        "http-virustotal",
+        "http-vuln-cve2006-3392",
+        "http-vuln-cve2009-3960",
+        "http-vuln-cve2010-0738",
+        "http-vuln-cve2010-2861",
+        "http-vuln-cve2011-3192",
+        "http-vuln-cve2011-3368",
+        "http-vuln-cve2012-1823",
+        "http-vuln-cve2013-0156",
+        "http-vuln-cve2013-7091",
+        "http-vuln-cve2014-2128",
+        "http-xssed",
+        "http-wordpress-enum",
+        "irc-unrealircd-backdoor",
+        "jdwp-version",
+        "maxdb-info",
+        "ms-sql-dac",
+        "ms-sql-empty-password",
+        "mysql-empty-password",
+        "mysql-enum",
+        "mysql-vuln-cve2012-2122",
+        "oracle-enum-users",
+        "p2p-conficker",
+        "qconn-exec",
+        "quake1-info",
+        "rdp-enum-encryption",
+        "rdp-vuln-ms12-020",
+        "realvnc-auth-bypass",
+        "rmi-vuln-classloader",
+        "samba-vuln-cve-2012-1182",
+        "smb-vuln-ms10-061",
+        "smtp-open-relay",
+        "socks-open-proxy",
+        "sshv1",
+        "ssl-ccs-injection",
+        "ssl-known-key",
+        "sslv2",
+        "stuxnet-detect",
+        "teamspeak2-version",
+        "tftp-enum",
+        "vnc-info",
+        "vuze-dht-info",
+        "x11-access",
+    )
+
 
     #--------------------------------------------------------------------------
     def check_params(self):
@@ -90,10 +185,34 @@ class NmapScanPlugin(TestingPlugin):
     #--------------------------------------------------------------------------
     def run(self, info):
 
+        # Get the list of supported NSE scripts.
+        # XXX FIXME this is very wrong!!! But for some reason
+        # the RPC is not giving me back the KeyError exception
+        # and just prints the traceback on the screen.
+        if self.state.check("supported_nse_scripts"):
+            supported_nse_scripts = self.state.get("supported_nse_scripts")
+        else:
+            supported_nse_scripts = []
+            for script in self.SCRIPTS:
+                code = run_external_tool(
+                    "nmap", ["--script-help=%s.nse" % script],
+                    callback=lambda x:x)
+                if code == 0:
+                    supported_nse_scripts.append(script)
+            supported_nse_scripts = tuple(supported_nse_scripts)
+            self.state.set("supported_nse_scripts", supported_nse_scripts)
+        if not supported_nse_scripts:
+            Logger.log_more_verbose(
+                "Warning: no compatible NSE scripts found!")
+
         # Build the command line arguments for Nmap.
         args = shlex.split( Config.plugin_args["args"] )
         if info.version == 6 and "-6" not in args:
             args.append("-6")
+        if supported_nse_scripts and "--script" not in args and not any(
+                x.startswith("--script=") for x in args):
+            args.append( "--script=" + ",".join(
+                x + ".nse" for x in supported_nse_scripts) )
         args.append( info.address )
 
         # The Nmap output will be saved in XML format in a temporary file.
@@ -114,10 +233,17 @@ class NmapScanPlugin(TestingPlugin):
             if code:
                 Logger.log_error(
                     "Nmap execution failed, status code: %d" % code)
-            else:
-                Logger.log(
-                    "Nmap scan finished in %s seconds for target: %s"
-                    % (t2 - t1, info.address))
+                return
+            Logger.log(
+                "Nmap scan finished in %s seconds for target: %s"
+                % (t2 - t1, info.address))
+
+            # # DEBUG
+            # with open(output, "rb") as fd1:
+            #     with open("nmap_test.xml", "wb") as fd2:
+            #         import shutil
+            #         shutil.copyfileobj(fd1, fd2)
+            # # DEBUG
 
             # Parse and return the results.
             return self.parse_nmap_results(info, output)
@@ -184,8 +310,8 @@ class NmapScanPlugin(TestingPlugin):
 
 
     #--------------------------------------------------------------------------
-    @staticmethod
-    def parse_nmap_host(host, hostmap):
+    @classmethod
+    def parse_nmap_host(cls, host, hostmap):
         """
         Convert the output of an Nmap scan to the GoLismero data model.
 
@@ -203,6 +329,9 @@ class NmapScanPlugin(TestingPlugin):
 
         # File format details can be found here:
         # https://svn.nmap.org/nmap/docs/nmap.dtd
+
+        # This is the object where we'll pin all the vulnerabilities.
+        vuln_ip = None
 
         # Get the timestamp.
         timestamp = host.get("endtime")
@@ -224,6 +353,8 @@ class NmapScanPlugin(TestingPlugin):
             if address not in hostmap:
                 hostmap[address] = IP(address)
             ip_addresses.append( hostmap[address] )
+            if vuln_ip is None:
+                vuln_ip = hostmap[address]
 
         # Link all the IP addresses to each other.
         ips_visited = set()
@@ -411,5 +542,68 @@ class NmapScanPlugin(TestingPlugin):
                 ip.add_information(fingerprint)
                 results.append(fingerprint)
 
+        # Parse the NSE script results.
+        if vuln_ip is not None:
+            for node in host.findall(".//hostscript"):
+                for node in node.findall(".//script"):
+                    try:
+                        script = node.get("id")
+                        output = node.get("output")
+                        if "\r\n" in output:
+                            output = output.replace("\r\n", "\n")
+                        method = script.replace("-", "_").replace(".", "_")
+                        method = "parse_" + method
+                        if hasattr(cls, method):
+                            r = getattr(cls, method)(
+                                output, vuln_ip, host, hostmap)
+                            if r:
+                                results.extend(r)
+                    except Exception:
+                        warn("Error parsing NSE script results: %s" % \
+                             format_exc(), RuntimeWarning)
+
         # Return the results.
         return results
+
+    @classmethod
+    def parse_dns_blacklist(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the dns-blacklist NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+#         output = """
+#   PROXY
+#     dnsbl.ahbl.org - PROXY
+#     dnsbl.tornevall.org - PROXY
+#       IP marked as "abusive host".
+#       Proxy is working
+#       Proxy has been scanned
+#   SPAM
+#     dnsbl.inps.de - SPAM
+#       Spam Received See: http://www.sorbs.net/lookup.shtml?1.2.3.4
+#     l2.apews.org - SPAM
+#     list.quorum.to - SPAM
+#     bl.spamcop.net - SPAM
+#     spam.dnsbl.sorbs.net - SPAM
+# """
+        for line in output.split("\n"):
+            if line.endswith(" - PROXY") or line.endswith(" - SPAM"):
+                vuln = MaliciousIP(vuln_ip)
+                vuln.description += "\nNSE Script output:\n" + output
+                return [vuln]
