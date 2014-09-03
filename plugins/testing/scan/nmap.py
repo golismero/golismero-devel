@@ -84,8 +84,8 @@ class NmapScanPlugin(TestingPlugin):
         "afp-path-vuln",
         "dns-blacklist",
         "dns-random-srcport",
-        # "dns-random-txid",
-        # "dns-recursion",
+        "dns-random-txid",
+        "dns-recursion",
         # "dns-service-discovery",
         # "dns-srv-enum",
         # "dns-update",
@@ -683,6 +683,74 @@ class NmapScanPlugin(TestingPlugin):
                     "https://www.dns-oarc.net/oarc/services/porttest"],
                 description = (
                 "A DNS server was found to have predictable source ports, "
+                "which can make a DNS server vulnerable to cache poisoning "
+                "attacks (see CVE-2008-1447).\n\nNSE Script output:\n" + output)
+            )]
+
+    @classmethod
+    def parse_dns_random_txid(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the dns-random-txid NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the real port number instead of the default
+        if " is GREAT: " in output:
+            return [VulnerableService(
+                vuln_ip, 53, "UDP",
+                cve = ["CVE-2008-1447"],
+                references = [
+                    "https://www.dns-oarc.net/oarc/services/txidtest"],
+                description = (
+                "A DNS server was found to have predictable TXID values, "
+                "which can make a DNS server vulnerable to cache poisoning "
+                "attacks (see CVE-2008-1447).\n\nNSE Script output:\n" + output)
+            )]
+
+    @classmethod
+    def parse_dns_recursion(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the dns-recursion NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the real port number instead of the default
+        if " is GREAT: " in output:
+            return [VulnerableService(
+                vuln_ip, 53, "UDP",
+                cve = ["CVE-2008-1447"],
+                description = (
+                "A DNS server was found to have recursion enabled, "
                 "which can make a DNS server vulnerable to cache poisoning "
                 "attacks (see CVE-2008-1447).\n\nNSE Script output:\n" + output)
             )]
