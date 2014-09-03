@@ -82,9 +82,8 @@ class NmapScanPlugin(TestingPlugin):
     # installed version of Nmap, and run only those.
     SCRIPTS = (
         "afp-path-vuln",
-        # "cvs-brute-repository",
-        # "dns-blacklist",
-        # "dns-random-srcport",
+        "dns-blacklist",
+        "dns-random-srcport",
         # "dns-random-txid",
         # "dns-recursion",
         # "dns-service-discovery",
@@ -569,7 +568,10 @@ class NmapScanPlugin(TestingPlugin):
 #       http://support.apple.com/kb/HT1222
 #       http://www.cqure.net/wp/2010/03/detecting-apple-mac-os-x-afp-vulnerability-cve-2010-0533-with-nmap
 # """
-#             r = cls.parse_afp_path_vuln(output, vuln_ip, host, hostmap)
+#             output = "X.X.X.X is GREAT: 26 queries in 1.2 seconds from 26 ports with std dev 17905"
+#             r = cls.parse_dns_random_srcport(output, vuln_ip, host, hostmap)
+#             Logger.log(repr(r))
+#             Logger.log(r[0].description)
 
             for node in host.findall(".//hostscript"):
                 for node in node.findall(".//script"):
@@ -649,3 +651,38 @@ class NmapScanPlugin(TestingPlugin):
                 vuln = MaliciousIP(vuln_ip)
                 vuln.description += "\nNSE Script output:\n" + output
                 return [vuln]
+
+    @classmethod
+    def parse_dns_random_srcport(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the dns-random-srcport NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the real port number instead of the default
+        if " is GREAT: " in output:
+            return [VulnerableService(
+                vuln_ip, 53, "UDP",
+                cve = ["CVE-2008-1447"],
+                references = [
+                    "https://www.dns-oarc.net/oarc/services/porttest"],
+                description = (
+                "A DNS server was found to have predictable source ports, "
+                "which can make a DNS server vulnerable to cache poisoning "
+                "attacks (see CVE-2008-1447).\n\nNSE Script output:\n" + output)
+            )]
