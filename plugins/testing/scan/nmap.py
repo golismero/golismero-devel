@@ -100,42 +100,38 @@ class NmapScanPlugin(TestingPlugin):
         "ftp-proftpd-backdoor",
         "ftp-vsftpd-backdoor",
         "ftp-vuln-cve2010-4221",
-        # "hadoop-datanode-info",
-        # "hadoop-jobtracker-info",
-        # "hadoop-namenode-info",
-        # "hadoop-secondary-namenode-info",
-        # "hadoop-tasktracker-info",
-        # "http-adobe-coldfusion-apsa1301",
-        # "http-awstatstotals-exec",
-        # "http-axis2-dir-traversal",
-        # "http-barracuda-dir-traversal",
-        # "http-coldfusion-subzero",
-        # "http-drupal-enum-users",
-        # "http-frontpage-login",
-        # "http-git",
+        # "hadoop-datanode-info",                   # needs a vuln class
+        # "hadoop-jobtracker-info",                 # needs a vuln class
+        # "hadoop-namenode-info",                   # needs a vuln class
+        # "hadoop-secondary-namenode-info",         # needs a vuln class
+        # "hadoop-tasktracker-info",                # needs a vuln class
+        "http-adobe-coldfusion-apsa1301",
+        # "http-awstatstotals-exec",                # complex to parse
+        "http-coldfusion-subzero",
+        "http-drupal-enum-users",
+        "http-frontpage-login",
+        # "http-git",                               # needs a vuln class
         # "http-google-malware",                    # requires API key
-        # "http-iis-short-name-brute",
-        # "http-iis-webdav-vuln",
-        # "http-litespeed-sourcecode-download",
-        # "http-majordomo2-dir-traversal",
-        # "http-malware-host",
-        # "http-method-tamper",
-        # "http-open-proxy",
-        # "http-phpmyadmin-dir-traversal",
-        # "http-slowloris-check",
-        # "http-userdir-enum",
-        # "http-vmware-path-vuln",
-        # "http-virustotal",
-        # "http-vuln-cve2006-3392",
-        # "http-vuln-cve2009-3960",
-        # "http-vuln-cve2010-0738",
-        # "http-vuln-cve2010-2861",
-        # "http-vuln-cve2011-3192",
-        # "http-vuln-cve2011-3368",
-        # "http-vuln-cve2012-1823",
-        # "http-vuln-cve2013-0156",
-        # "http-vuln-cve2013-7091",
-        # "http-vuln-cve2014-2128",
+        "http-iis-short-name-brute",
+        "http-iis-webdav-vuln",
+        # "http-litespeed-sourcecode-download",     # needs a vuln class
+        "http-malware-host",
+        "http-method-tamper",
+        # "http-open-proxy",                        # needs a vuln class
+        "http-slowloris-check",
+        # "http-userdir-enum",                      # needs a vuln class
+        "http-vmware-path-vuln",
+        # "http-virustotal",                        # needs API key
+        "http-vuln-cve2006-3392",
+        "http-vuln-cve2009-3960",
+        "http-vuln-cve2010-0738",
+        "http-vuln-cve2010-2861",
+        "http-vuln-cve2011-3192",
+        "http-vuln-cve2011-3368",
+        "http-vuln-cve2012-1823",
+        "http-vuln-cve2013-0156",
+        "http-vuln-cve2013-7091",
+        "http-vuln-cve2014-2128",
         # "http-xssed",
         # "http-wordpress-enum",
         # "irc-unrealircd-backdoor",
@@ -545,35 +541,6 @@ class NmapScanPlugin(TestingPlugin):
 
         # Parse the NSE script results.
         if vuln_ip is not None:
-
-#             # XXX DEBUG
-#             output = """
-# VULNERABLE:
-#   Apple Mac OS X AFP server directory traversal
-#     State: VULNERABLE (Exploitable)
-#     IDs:  CVE:CVE-2010-0533
-#     Risk factor: High  CVSSv2: 7.5 (HIGH) (AV:N/AC:L/Au:N/C:P/I:P/A:P)
-#     Description:
-#       Directory traversal vulnerability in AFP Server in Apple Mac OS X before
-#       10.6.3 allows remote attackers to list a share root's parent directory.
-#     Disclosure date: 2010-03-29
-#     Exploit results:
-#       Patrik Karlsson's Public Folder/../ (5 first items)
-#       .bash_history
-#       .bash_profile
-#       .CFUserTextEncoding
-#       .config/
-#       .crash_report_checksum
-#     References:
-#       http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2010-0533
-#       http://support.apple.com/kb/HT1222
-#       http://www.cqure.net/wp/2010/03/detecting-apple-mac-os-x-afp-vulnerability-cve-2010-0533-with-nmap
-# """
-#             output = "X.X.X.X is GREAT: 26 queries in 1.2 seconds from 26 ports with std dev 17905"
-#             r = cls.parse_dns_random_srcport(output, vuln_ip, host, hostmap)
-#             Logger.log(repr(r))
-#             Logger.log(r[0].description)
-
             for node in host.findall(".//hostscript"):
                 for node in node.findall(".//script"):
                     try:
@@ -594,6 +561,34 @@ class NmapScanPlugin(TestingPlugin):
 
         # Return the results.
         return results
+
+    @classmethod
+    def _parse_nse_vulnerability(cls, output, vuln_ip, port, proto = "TCP"):
+        """
+        Parse the output of a typical vulnerability testing NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param port: Port where the vulnerable service was found.
+        :type port: int
+
+        :param proto: Protocol name (TCP or UDP).
+        :type proto: str
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the real port number instead of the default
+        # TODO extract the proper description string instead of appending.
+        if "VULNERABLE:" in output:
+            vuln = VulnerableService(vuln_ip, port, proto,
+                                     **extract_vuln_ids(output))
+            vuln.description += "\n\nNSE Script output:\n" + output
+            return [vuln]
 
     @classmethod
     def parse_afp_path_vuln(cls, output, vuln_ip, host, hostmap):
@@ -617,13 +612,7 @@ class NmapScanPlugin(TestingPlugin):
         :returns: Results from the Nmap scan for this host.
         :rtype: list(Data)
         """
-        # TODO get the real port number instead of the default
-        # TODO extract the proper description string instead of appending.
-        if "VULNERABLE:" in output:
-            vuln = VulnerableService(vuln_ip, 548, "TCP",
-                                     **extract_vuln_ids(output))
-            vuln.description += "\n\nNSE Script output:\n" + output
-            return [vuln]
+        return cls._parse_nse_vulnerability(output, vuln_ip, 548)
 
     @classmethod
     def parse_dns_blacklist(cls, output, vuln_ip, host, hostmap):
@@ -836,13 +825,7 @@ class NmapScanPlugin(TestingPlugin):
         :returns: Results from the Nmap scan for this host.
         :rtype: list(Data)
         """
-        # TODO get the real port number instead of the default
-        # TODO extract the proper description string instead of appending.
-        if "VULNERABLE:" in output:
-            vuln = VulnerableService(vuln_ip, 21, "TCP",
-                                     **extract_vuln_ids(output))
-            vuln.description += "\n\nNSE Script output:\n" + output
-            return [vuln]
+        return cls._parse_nse_vulnerability(output, vuln_ip, 21)
 
     @classmethod
     def parse_ftp_proftpd_backdoor(cls, output, vuln_ip, host, hostmap):
@@ -900,12 +883,7 @@ class NmapScanPlugin(TestingPlugin):
         :returns: Results from the Nmap scan for this host.
         :rtype: list(Data)
         """
-        # TODO get the real port number instead of the default
-        if "VULNERABLE:" in output:
-            vuln = VulnerableService(vuln_ip, 21, "TCP",
-                                     **extract_vuln_ids(output))
-            vuln.description += "\n\nNSE Script output:\n" + output
-            return [vuln]
+        return cls._parse_nse_vulnerability(output, vuln_ip, 21)
 
     @classmethod
     def parse_ftp_vuln_cve2010_4221(cls, output, vuln_ip, host, hostmap):
@@ -929,9 +907,523 @@ class NmapScanPlugin(TestingPlugin):
         :returns: Results from the Nmap scan for this host.
         :rtype: list(Data)
         """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 21)
+
+    @classmethod
+    def parse_http_adobe_coldfusion_apsa1301(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-adobe-coldfusion-apsa1301 NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
         # TODO get the real port number instead of the default
-        if "VULNERABLE:" in output:
-            vuln = VulnerableService(vuln_ip, 21, "TCP",
+        if "Extracted cookie:" in output:
+            vuln = VulnerableService(
+                vuln_ip, 80, "TCP",
+                cve=["CVE-2013-0631"],
+                references=["https://www.adobe.com/support/security/advisories/apsa13-01.html"])
+            vuln.description += "\n\nNSE Script output:\n" + output
+            return [vuln]
+
+    @classmethod
+    def parse_http_coldfusion_subzero(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-coldfusion-subzero NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the real port number instead of the default
+        vuln = VulnerableService(
+            vuln_ip, 80, "TCP",
+            references=["http://www.exploit-db.com/exploits/25305/"])
+        vuln.description += "\n\nNSE Script output:\n" + output
+        return [vuln]
+
+    @classmethod
+    def parse_http_drupal_enum_users(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-drupal-enum-users NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the real port number instead of the default
+        vuln = VulnerableService(
+            vuln_ip, 80, "TCP",
+            references=["http://www.madirish.net/node/465"])
+        vuln.description += "\n\nNSE Script output:\n" + output
+        return [vuln]
+
+    @classmethod
+    def parse_http_frontpage_login(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-frontpage-login NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 80)
+
+    @classmethod
+    def parse_http_iis_short_name_brute(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-iis-short-name-brute NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 80)
+
+    @classmethod
+    def parse_http_iis_webdav_vuln(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-iis-webdav-vuln NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the real port number instead of the default
+        if "Extracted cookie:" in output:
+            vuln = VulnerableService(
+                vuln_ip, 80, "TCP",
+                ms=["MS09-020"],
+                references=[
+                    "http://blog.zoller.lu/2009/05/iis-6-webdac-auth-bypass-and-data.html",
+                    "http://seclists.org/fulldisclosure/2009/May/att-134/IIS_Advisory_pdf.bin",
+                    "http://www.skullsecurity.org/blog/?p=271",
+                    "http://www.kb.cert.org/vuls/id/787932",
+                    "http://www.microsoft.com/technet/security/advisory/971492.mspx",
+                ])
+            vuln.description += "\n\nNSE Script output:\n" + output
+            return [vuln]
+
+    @classmethod
+    def parse_http_malware(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-malware NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if "Host appears to be infected" in output:
+            vuln = MaliciousIP(vuln_ip)
+            vuln.description += "\n\nNSE Script output:\n" + output
+            return [vuln]
+
+    @classmethod
+    def parse_http_method_tamper(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-method-tamper NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 80)
+
+    @classmethod
+    def parse_http_slowloris_check(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-slowloris-check NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 80)
+
+    @classmethod
+    def parse_http_vmware_path_vuln(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-vmware-path-vuln NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the real port number instead of the default
+        # TODO extract the proper description string instead of appending.
+        if ": VULNERABLE" in output:
+            vuln = VulnerableService(vuln_ip, 80,
                                      **extract_vuln_ids(output))
             vuln.description += "\n\nNSE Script output:\n" + output
             return [vuln]
+
+    @classmethod
+    def parse_http_vuln_cve2006_3392(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-vuln-cve2006-3392 NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 80)
+
+    @classmethod
+    def parse_http_vuln_cve2009_3960(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-vuln-cve2006-3392 NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 80)
+
+    @classmethod
+    def parse_http_vuln_cve2010_0738(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-vuln-cve2006-3392 NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 80)
+
+    @classmethod
+    def parse_http_vuln_cve2010_2861(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-vuln-cve2006-3392 NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 80)
+
+    @classmethod
+    def parse_http_vuln_cve2011_3192(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-vuln-cve2006-3392 NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 80)
+
+    @classmethod
+    def parse_http_vuln_cve2011_3368(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-vuln-cve2006-3392 NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 80)
+
+    @classmethod
+    def parse_http_vuln_cve2012_1823(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-vuln-cve2006-3392 NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 80)
+
+    @classmethod
+    def parse_http_vuln_cve2013_0156(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-vuln-cve2006-3392 NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 80)
+
+    @classmethod
+    def parse_http_vuln_cve2013_7091(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-vuln-cve2006-3392 NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 80)
+
+    @classmethod
+    def parse_http_vuln_cve2014_2128(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the http-vuln-cve2006-3392 NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 80)
