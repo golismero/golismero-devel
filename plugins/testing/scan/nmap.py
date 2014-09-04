@@ -38,7 +38,6 @@ from golismero.api.external import run_external_tool, tempfile, find_binary_in_p
 from golismero.api.logger import Logger
 from golismero.api.net import ConnectionSlot
 from golismero.api.plugin import ImportPlugin, TestingPlugin
-
 import shlex
 
 from socket import getservbyname
@@ -92,9 +91,9 @@ class NmapScanPlugin(TestingPlugin):
         # "dns-update",                             # needs a vuln class
         "dns-zeustracker",
         "domino-enum-users",
-        # "fcrdns",                                 # complex to parse
+        # "fcrdns",                                 # complex parsing
         # "finger",                                 # undocumented output
-        # "ftp-anon",                               # complex to parse
+        # "ftp-anon",                               # complex parsing
         # "ftp-bounce",                             # needs a vuln class
         "ftp-libopie",
         "ftp-proftpd-backdoor",
@@ -106,7 +105,7 @@ class NmapScanPlugin(TestingPlugin):
         # "hadoop-secondary-namenode-info",         # needs a vuln class
         # "hadoop-tasktracker-info",                # needs a vuln class
         "http-adobe-coldfusion-apsa1301",
-        # "http-awstatstotals-exec",                # complex to parse
+        # "http-awstatstotals-exec",                # complex parsing
         "http-coldfusion-subzero",
         "http-drupal-enum-users",
         "http-frontpage-login",
@@ -132,38 +131,38 @@ class NmapScanPlugin(TestingPlugin):
         "http-vuln-cve2013-0156",
         "http-vuln-cve2013-7091",
         "http-vuln-cve2014-2128",
-        # "http-xssed",
-        # "http-wordpress-enum",
-        # "irc-unrealircd-backdoor",
-        # "jdwp-version",
-        # "maxdb-info",
-        # "ms-sql-dac",
-        # "ms-sql-empty-password",
-        # "mysql-empty-password",
-        # "mysql-enum",
-        # "mysql-vuln-cve2012-2122",
-        # "oracle-enum-users",
-        # "p2p-conficker",
-        # "qconn-exec",
-        # "quake1-info",
-        # "rdp-enum-encryption",
-        # "rdp-vuln-ms12-020",
-        # "realvnc-auth-bypass",
-        # "rmi-vuln-classloader",
-        # "samba-vuln-cve-2012-1182",
-        # "smb-vuln-ms10-061",
-        # "smtp-open-relay",
-        # "socks-open-proxy",
-        # "sshv1",
-        # "ssl-ccs-injection",
-        # "ssl-known-key",
-        # "sslv2",
-        # "stuxnet-detect",
-        # "teamspeak2-version",
-        # "tftp-enum",
-        # "vnc-info",
-        # "vuze-dht-info",
-        # "x11-access",
+        # "http-xssed",                             # complex parsing
+        # "http-wordpress-enum",                    # needs a vuln class
+        "irc-unrealircd-backdoor",
+        # "jdwp-version",                           # needs a vuln class
+        # "maxdb-info",                             # needs a vuln class
+        # "ms-sql-dac",                             # needs a vuln class
+        # "ms-sql-empty-password",                  # needs a vuln class
+        # "mysql-empty-password",                   # needs a vuln class
+        # "mysql-enum",                             # needs a vuln class
+        "mysql-vuln-cve2012-2122",
+        # "oracle-enum-users",                      # needs a vuln class
+        "p2p-conficker",
+        # "qconn-exec",                             # needs a vuln class
+        # "quake1-info",                            # needs a vuln class
+        # "rdp-enum-encryption",                    # complex parsing
+        "rdp-vuln-ms12-020",
+        "realvnc-auth-bypass",
+        "rmi-vuln-classloader",
+        "samba-vuln-cve-2012-1182",
+        "smb-vuln-ms10-061",
+        # "smtp-open-relay",                        # needs a vuln class
+        # "socks-open-proxy",                       # needs a vuln class
+        # "sshv1",                                  # needs a vuln class
+        "ssl-ccs-injection",
+        # "ssl-known-key",                          # needs a vuln class
+        # "sslv2",                                  # needs the domain
+        "stuxnet-detect",
+        # "teamspeak2-version",                     # needs a vuln class
+        # "tftp-enum",                              # needs a vuln class
+        # "vnc-info",                               # needs a vuln class
+        # "vuze-dht-info",                          # needs a vuln class
+        # "x11-access",                             # needs a vuln class
     )
 
 
@@ -1427,3 +1426,276 @@ class NmapScanPlugin(TestingPlugin):
         :rtype: list(Data)
         """
         return cls._parse_nse_vulnerability(output, vuln_ip, 80)
+
+    @classmethod
+    def parse_irc_unrealircd_backdoor(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the irc-unrealircd-backdoor NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the real port number instead of the default
+        if "Looks like trojaned version of unrealircd." in output:
+            return [Backdoor(
+                vuln_ip, 6667, "TCP",
+                references = [
+                    "http://seclists.org/fulldisclosure/2010/Jun/277",
+                    "http://www.unrealircd.com/txt/unrealsecadvisory.20100612.txt",
+                    "http://www.metasploit.com/modules/exploit/unix/irc/unreal_ircd_3281_backdoor",                ],
+                description = (
+                "An backdoored UnrealIRCd server was found. This allows"
+                "any user to take control of the server."
+                "\n\nNSE Script output:\n" + output)
+            )]
+
+    @classmethod
+    def parse_mysql_vuln_cve2012_2122(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the mysql-vuln-cve2012-2122 NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 3306)
+
+    @classmethod
+    def parse_p2p_conficker(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the p2p-conficker NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO use the proper vulnerability class here
+        if "Host is likely INFECTED" in output:
+            return [MaliciousIP(
+                vuln_ip,
+                description = (
+                "This host appears to be infected with the Conficker malware."
+                "\n\nNSE Script output:\n" + output)
+            )]
+
+    @classmethod
+    def parse_rdp_vuln_ms12_020(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the rdp-vuln-ms12-020 NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 3389)
+
+    @classmethod
+    def parse_realvnc_auth_bypass(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the realvnc-auth-bypass NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the real port number instead of the default
+        if "Vulnerable" in output:
+            vuln = VulnerableService(
+                vuln_ip, 5900, "TCP",
+                cve=["CVE-2006-2369"],
+            )
+            vuln.description += "\n\nNSE Script output:\n" + output
+            return [vuln]
+
+    @classmethod
+    def parse_rmi_vuln_classloader(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the rmi-vuln-classloader NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 1099)
+
+    @classmethod
+    def parse_samba_vuln_cve_2012_1182(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the samba-vuln-cve-2012-1182 NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 139)
+
+    @classmethod
+    def parse_smb_vuln_ms10_061(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the smb-vuln-ms10-061 NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 445)
+
+    @classmethod
+    def parse_ssl_ccs_injection(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the ssl-ccs-injection NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return cls._parse_nse_vulnerability(output, vuln_ip, 443)
+
+    @classmethod
+    def parse_stuxnet_detect(cls, output, vuln_ip, host, hostmap):
+        """
+        Parse the output of the stuxnet-detect NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param host: XML node with the scanned host information.
+        :type host: xml.etree.ElementTree.Element
+
+        :param hostmap: Dictionary that maps IP addresses to IP data objects.
+            This prevents the plugin from reporting duplicated addresses.
+            Updated by this method.
+        :type hostmap: dict( str -> IP )
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO use the proper vulnerability class here
+        if "INFECTED" in output:
+            return [MaliciousIP(
+                vuln_ip,
+                description = (
+                "This host appears to be infected with the Stuxnet malware."
+                "\n\nNSE Script output:\n" + output)
+            )]
