@@ -42,7 +42,7 @@ from golismero.api.net import ConnectionSlot
 from golismero.api.plugin import ImportPlugin, TestingPlugin
 import shlex
 
-from socket import getservbyname
+from socket import getservbyname, getservbyport
 from time import time
 from traceback import format_exc
 from warnings import warn
@@ -88,7 +88,7 @@ class NmapScanPlugin(TestingPlugin):
     SCRIPTS_VULN_STANDARD = (
         "afp-path-vuln",
         "ftp-libopie",
-        "ftp-vsftpd-backdoor",          # not sure about this...
+        "ftp-vsftpd-backdoor",
         "ftp-vuln-cve2010-4221",
         "http-frontpage-login",
         "http-iis-short-name-brute",
@@ -127,7 +127,7 @@ class NmapScanPlugin(TestingPlugin):
         "domino-enum-users",
         # "fcrdns",                                 # complex parsing
         # "finger",                                 # undocumented output
-        # "ftp-anon",                               # complex parsing
+        "ftp-anon",
         "ftp-bounce",
         "ftp-proftpd-backdoor",
         # "hadoop-datanode-info",                   # needs a vuln class
@@ -146,7 +146,7 @@ class NmapScanPlugin(TestingPlugin):
         "http-malware-host",
         "http-open-proxy",
         # "http-userdir-enum",                      # needs a vuln class
-        # "http-virustotal",                        # needs API key
+        # "http-virustotal",                        # requires API key
         "http-vmware-path-vuln",
         # "http-xssed",                             # complex parsing
         # "http-wordpress-enum",                    # needs a vuln class
@@ -431,6 +431,7 @@ class NmapScanPlugin(TestingPlugin):
                 ports.add( (state, protocol, port) )
                 if state == "open":
                     serv_node = node.find("service")
+                    service = None
                     if serv_node is not None:
                         service = serv_node.get("name")
                         if service:
@@ -442,9 +443,11 @@ class NmapScanPlugin(TestingPlugin):
                             else:
                                 protocol = protocol.upper()
                             services.add( (service, port, protocol) )
+
+                    # Parse the port script results.
                     for script_node in node.findall(".//script"):
                         r = cls.parse_script(
-                                script_node, vuln_ip, port, protocol)
+                                script_node, vuln_ip, service, port, protocol)
                         if r:
                             results.extend(r)
             except Exception:
@@ -573,7 +576,8 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_script(cls, node, vuln_ip, port = None, proto = None):
+    def parse_script(cls, node, vuln_ip,
+                     service = None, port = None, proto = None):
         """
         Parse the output of an NSE script.
 
@@ -582,6 +586,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -603,7 +610,7 @@ class NmapScanPlugin(TestingPlugin):
         if "\r\n" in output:
             output = output.replace("\r\n", "\n")
 
-        # Get the port and protocol if missing.
+        # Get the service, port and protocol if missing.
         # XXX not sure if this is really needed...
         if port is None:
             service = script.split("-", 1)[0]
@@ -618,6 +625,8 @@ class NmapScanPlugin(TestingPlugin):
                 port = getservbyname(service, proto.lower())
         elif proto is None:
             proto = "TCP"
+        if service is None and port is not None:
+            service = getservbyport(port, proto)
 
         # If it's a standard vulnerability script...
         if script in cls.SCRIPTS_VULN_STANDARD:
@@ -634,7 +643,7 @@ class NmapScanPlugin(TestingPlugin):
         method = script.replace("-", "_").replace(".", "_")
         method = "parse_" + method
         if hasattr(cls, method):
-            r = getattr(cls, method)(output, vuln_ip, port, proto)
+            r = getattr(cls, method)(output, vuln_ip, service, port, proto)
             if r:
                 for obj in r:
                     if obj.is_instance(Vulnerability):
@@ -647,7 +656,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_dns_blacklist(cls, output, vuln_ip, port, proto):
+    def parse_dns_blacklist(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the dns-blacklist NSE script.
 
@@ -656,6 +665,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -673,7 +685,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_dns_random_srcport(cls, output, vuln_ip, port, proto):
+    def parse_dns_random_srcport(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the dns-random-srcport NSE script.
 
@@ -682,6 +694,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -707,7 +722,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_dns_random_txid(cls, output, vuln_ip, port, proto):
+    def parse_dns_random_txid(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the dns-random-txid NSE script.
 
@@ -716,6 +731,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -741,7 +759,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_dns_recursion(cls, output, vuln_ip, port, proto):
+    def parse_dns_recursion(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the dns-recursion NSE script.
 
@@ -750,6 +768,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -773,7 +794,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_dns_zeustracker(cls, output, vuln_ip, port, proto):
+    def parse_dns_zeustracker(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the dns-zeustracker NSE script.
 
@@ -782,6 +803,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -802,7 +826,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_domino_enum_users(cls, output, vuln_ip, port, proto):
+    def parse_domino_enum_users(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the domino-enum-users NSE script.
 
@@ -828,7 +852,35 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_ftp_bounce(cls, output, vuln_ip, port, proto):
+    def parse_ftp_anon(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the ftp-anon NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if "Anonymous FTP login allowed" in output:
+            return [UnauthenticatedService(vuln_ip, port, proto)]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_ftp_bounce(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the ftp-bounce NSE script.
 
@@ -837,6 +889,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -853,7 +908,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_ftp_proftpd_backdoor(cls, output, vuln_ip, port, proto):
+    def parse_ftp_proftpd_backdoor(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the ftp-proftpd-backdoor NSE script.
 
@@ -862,6 +917,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -885,7 +943,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_http_adobe_coldfusion_apsa1301(cls, output, vuln_ip, port, proto):
+    def parse_http_adobe_coldfusion_apsa1301(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the http-adobe-coldfusion-apsa1301 NSE script.
 
@@ -894,6 +952,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -914,7 +975,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_http_coldfusion_subzero(cls, output, vuln_ip, port, proto):
+    def parse_http_coldfusion_subzero(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the http-coldfusion-subzero NSE script.
 
@@ -923,6 +984,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -940,7 +1004,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_http_drupal_enum_users(cls, output, vuln_ip, port, proto):
+    def parse_http_drupal_enum_users(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the http-drupal-enum-users NSE script.
 
@@ -949,6 +1013,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -966,7 +1033,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_http_iis_webdav_vuln(cls, output, vuln_ip, port, proto):
+    def parse_http_iis_webdav_vuln(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the http-iis-webdav-vuln NSE script.
 
@@ -975,6 +1042,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -1000,7 +1070,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_http_malware_host(cls, output, vuln_ip, port, proto):
+    def parse_http_malware_host(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the http-malware-host NSE script.
 
@@ -1025,7 +1095,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_http_open_proxy(cls, output, vuln_ip, port, proto):
+    def parse_http_open_proxy(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the http-open-proxy NSE script.
 
@@ -1034,6 +1104,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -1050,7 +1123,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_http_vmware_path_vuln(cls, output, vuln_ip, port, proto):
+    def parse_http_vmware_path_vuln(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the http-vmware-path-vuln NSE script.
 
@@ -1059,6 +1132,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -1077,7 +1153,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_irc_unrealircd_backdoor(cls, output, vuln_ip, port, proto):
+    def parse_irc_unrealircd_backdoor(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the irc-unrealircd-backdoor NSE script.
 
@@ -1086,6 +1162,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -1111,7 +1190,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_jdwp_info(cls, output, vuln_ip, port, proto):
+    def parse_jdwp_info(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the jdwp-info NSE script.
 
@@ -1120,6 +1199,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -1135,7 +1217,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_ms_sql_empty_password(cls, output, vuln_ip, port, proto):
+    def parse_ms_sql_empty_password(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the ms-sql-empty-password NSE script.
 
@@ -1161,7 +1243,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_mysql_empty_password(cls, output, vuln_ip, port, proto):
+    def parse_mysql_empty_password(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the mysql-empty-password NSE script.
 
@@ -1170,6 +1252,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -1187,7 +1272,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_p2p_conficker(cls, output, vuln_ip, port, proto):
+    def parse_p2p_conficker(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the p2p-conficker NSE script.
 
@@ -1196,6 +1281,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -1217,7 +1305,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_realvnc_auth_bypass(cls, output, vuln_ip, port, proto):
+    def parse_realvnc_auth_bypass(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the realvnc-auth-bypass NSE script.
 
@@ -1226,6 +1314,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -1245,7 +1336,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_smtp_open_relay(cls, output, vuln_ip, port, proto):
+    def parse_smtp_open_relay(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the smtp-open-relay NSE script.
 
@@ -1254,6 +1345,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -1270,7 +1364,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_socks_open_proxy(cls, output, vuln_ip, port, proto):
+    def parse_socks_open_proxy(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the socks-open-proxy NSE script.
 
@@ -1279,6 +1373,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -1295,7 +1392,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_stuxnet_detect(cls, output, vuln_ip, port, proto):
+    def parse_stuxnet_detect(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the stuxnet-detect NSE script.
 
@@ -1304,6 +1401,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
@@ -1325,7 +1425,7 @@ class NmapScanPlugin(TestingPlugin):
 
     #--------------------------------------------------------------------------
     @classmethod
-    def parse_x11_access(cls, output, vuln_ip, port, proto):
+    def parse_x11_access(cls, output, vuln_ip, service, port, proto):
         """
         Parse the output of the x11-access NSE script.
 
@@ -1334,6 +1434,9 @@ class NmapScanPlugin(TestingPlugin):
 
         :param vuln_ip: IP address to pin the vulnerabilities to.
         :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
 
         :param port: Port number, or None if missing.
         :type port: int | None
