@@ -31,6 +31,8 @@ from golismero.api.data.information.traceroute import Traceroute, Hop
 from golismero.api.data.resource.domain import Domain
 from golismero.api.data.resource.ip import IP
 from golismero.api.data.resource.mac import MAC
+from golismero.api.data.resource.url import URL
+from golismero.api.data.vulnerability.information_disclosure.source_code_disclosure import SourceCodeDisclosure
 from golismero.api.data.vulnerability.infrastructure.vulnerable_service import VulnerableService, UnauthenticatedService, \
     OpenProxyService
 from golismero.api.data.vulnerability.malware.backdoor import Backdoor
@@ -139,7 +141,7 @@ class NmapScanPlugin(TestingPlugin):
         # "http-awstatstotals-exec",                # complex parsing
         "http-coldfusion-subzero",
         "http-drupal-enum-users",
-        # "http-git",                               # needs a vuln class
+        "http-git",
         # "http-google-malware",                    # requires API key
         "http-iis-webdav-vuln",
         # "http-litespeed-sourcecode-download",     # needs a vuln class
@@ -1029,6 +1031,40 @@ class NmapScanPlugin(TestingPlugin):
         return [VulnerableService(
             vuln_ip, port, proto,
             references=["http://www.madirish.net/node/465"])]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_http_git(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the http-git NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        results = []
+        for line in output.split("\n"):
+            if line.endswith(".git"):
+                url  = URL("%s://%s" % (service, line.strip()))
+                vuln = SourceCodeDisclosure(url)
+                results.append(url)
+                results.append(vuln)
+        return results
 
 
     #--------------------------------------------------------------------------
