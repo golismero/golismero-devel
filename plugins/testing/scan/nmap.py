@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from golismero.api.data.vulnerability.information_disclosure.information_disclosure import InformationDisclosure
 
 __license__ = """
 GoLismero 2.0 - The web knife - Copyright (C) 2011-2014
@@ -115,6 +116,32 @@ class NmapScanPlugin(TestingPlugin):
         "qconn-exec",
     )
 
+    # Scripts that when successful constitute an information leak.
+    # All we do with these for now is put the output of the script
+    # in the description, but if we start extracting the information
+    # too then this "category" will cease to exist.
+    SCRIPTS_INFOLEAK = (
+        "dns-service-discovery",
+        "dns-srv-enum",
+        "dns-update",
+        "hadoop-datanode-info",
+        "hadoop-jobtracker-info",
+        "hadoop-namenode-info",
+        "hadoop-secondary-namenode-info",
+        "hadoop-tasktracker-info",
+        "http-userdir-enum",
+        "http-wordpress-enum",
+        "maxdb-info",
+        "ms-sql-dac",
+        "mysql-enum",
+        "oracle-enum-users",
+        "quake1-info",
+        "teamspeak2-version",
+        "tftp-enum",
+        "vnc-info",
+        "vuze-dht-info",
+    )
+
     # All other scripts get treated as special cases and a callback will
     # be used to handle each one of them.
     SCRIPTS = (
@@ -122,9 +149,6 @@ class NmapScanPlugin(TestingPlugin):
         "dns-random-srcport",
         "dns-random-txid",
         "dns-recursion",
-        # "dns-service-discovery",                  # needs a vuln class
-        # "dns-srv-enum",                           # needs a vuln class
-        # "dns-update",                             # needs a vuln class
         "dns-zeustracker",
         "domino-enum-users",
         # "fcrdns",                                 # complex parsing
@@ -132,11 +156,6 @@ class NmapScanPlugin(TestingPlugin):
         "ftp-anon",
         "ftp-bounce",
         "ftp-proftpd-backdoor",
-        # "hadoop-datanode-info",                   # needs a vuln class
-        # "hadoop-jobtracker-info",                 # needs a vuln class
-        # "hadoop-namenode-info",                   # needs a vuln class
-        # "hadoop-secondary-namenode-info",         # needs a vuln class
-        # "hadoop-tasktracker-info",                # needs a vuln class
         "http-adobe-coldfusion-apsa1301",
         # "http-awstatstotals-exec",                # complex parsing
         "http-coldfusion-subzero",
@@ -144,24 +163,17 @@ class NmapScanPlugin(TestingPlugin):
         "http-git",
         # "http-google-malware",                    # requires API key
         "http-iis-webdav-vuln",
-        # "http-litespeed-sourcecode-download",     # needs a vuln class
+        "http-litespeed-sourcecode-download",
         "http-malware-host",
         "http-open-proxy",
-        # "http-userdir-enum",                      # needs a vuln class
         # "http-virustotal",                        # requires API key
         "http-vmware-path-vuln",
         # "http-xssed",                             # complex parsing
-        # "http-wordpress-enum",                    # needs a vuln class
         "irc-unrealircd-backdoor",
         "jdwp-info",
-        # "maxdb-info",                             # needs a vuln class
-        # "ms-sql-dac",                             # needs a vuln class
         "ms-sql-empty-password",
         "mysql-empty-password",
-        # "mysql-enum",                             # needs a vuln class
-        # "oracle-enum-users",                      # needs a vuln class
         "p2p-conficker",
-        # "quake1-info",                            # needs a vuln class
         # "rdp-enum-encryption",                    # complex parsing
         "realvnc-auth-bypass",
         "smtp-open-relay",
@@ -170,10 +182,6 @@ class NmapScanPlugin(TestingPlugin):
         # "ssl-known-key",                          # needs a vuln class
         # "sslv2",                                  # needs the domain
         "stuxnet-detect",
-        # "teamspeak2-version",                     # needs a vuln class
-        # "tftp-enum",                              # needs a vuln class
-        # "vnc-info",                               # needs a vuln class
-        # "vuze-dht-info",                          # needs a vuln class
         "x11-access",
     )
 
@@ -200,7 +208,11 @@ class NmapScanPlugin(TestingPlugin):
             supported_nse_scripts = self.state.get("supported_nse_scripts")
         else:
             supported_nse_scripts = []
-            for script in self.SCRIPTS + self.SCRIPTS_VULN_STANDARD:
+            for script in (
+                self.SCRIPTS +
+                self.SCRIPTS_INFOLEAK +
+                self.SCRIPTS_VULN_STANDARD
+            ):
                 code = run_external_tool(
                     "nmap", ["--script-help=%s.nse" % script],
                     callback=lambda x:x)
@@ -640,6 +652,14 @@ class NmapScanPlugin(TestingPlugin):
                     "\n\nNSE script '%s' output:\n%s" % (script, output)
                 )
                 return [vuln]
+
+        # If it's an infoleak script...
+        elif script in cls.SCRIPTS_INFOLEAK:
+            vuln = InformationDisclosure(vuln_ip)
+            vuln.description += (
+                "\n\nNSE script '%s' output:\n%s" % (script, output)
+            )
+            return [vuln]
 
         # If it's any other script...
         method = script.replace("-", "_").replace(".", "_")
@@ -1101,6 +1121,39 @@ class NmapScanPlugin(TestingPlugin):
                     "http://www.skullsecurity.org/blog/?p=271",
                     "http://www.kb.cert.org/vuls/id/787932",
                     "http://www.microsoft.com/technet/security/advisory/971492.mspx",
+                ])]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_http_litespeed_sourcecode_download(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the http-litespeed-sourcecode-download NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if " source code:" in output:
+            return [VulnerableService(
+                vuln_ip, port, proto,
+                cve=["CVE-2010-2333"],
+                references=[
+                    "http://www.exploit-db.com/exploits/13850/",
                 ])]
 
 
