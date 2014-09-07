@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from golismero.api.data.vulnerability.information_disclosure.information_disclosure import InformationDisclosure
 
 __license__ = """
 GoLismero 2.0 - The web knife - Copyright (C) 2011-2014
@@ -23,6 +24,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 """
 
 from golismero.api.config import Config
+from golismero.api.data import Vulnerability
 from golismero.api.data.db import Database
 from golismero.api.data.information.fingerprint import OSFingerprint, ServiceFingerprint
 from golismero.api.data.information.portscan import Portscan
@@ -30,14 +32,20 @@ from golismero.api.data.information.traceroute import Traceroute, Hop
 from golismero.api.data.resource.domain import Domain
 from golismero.api.data.resource.ip import IP
 from golismero.api.data.resource.mac import MAC
+from golismero.api.data.resource.url import URL
+from golismero.api.data.vulnerability.information_disclosure.source_code_disclosure import SourceCodeDisclosure
+from golismero.api.data.vulnerability.infrastructure.vulnerable_service import VulnerableService, UnauthenticatedService, \
+    OpenProxyService
+from golismero.api.data.vulnerability.malware.backdoor import Backdoor
+from golismero.api.data.vulnerability.malware.malicious import MaliciousIP
+from golismero.api.data.vulnerability.vuln_utils import extract_vuln_ids
 from golismero.api.external import run_external_tool, tempfile, find_binary_in_path
 from golismero.api.logger import Logger
 from golismero.api.net import ConnectionSlot
 from golismero.api.plugin import ImportPlugin, TestingPlugin
-
 import shlex
 
-from socket import getservbyname
+from socket import getservbyname, getservbyport
 from time import time
 from traceback import format_exc
 from warnings import warn
@@ -56,7 +64,7 @@ class NmapImportPlugin(ImportPlugin):
     def is_supported(self, input_file):
         if input_file and input_file.lower().endswith(".xml"):
             with open(input_file, "rU") as fd:
-                return "<nmaprun " in fd.read(1024)
+                return "<nmaprun " in fd.read(10240)
         return False
 
 
@@ -74,6 +82,108 @@ class NmapImportPlugin(ImportPlugin):
 #------------------------------------------------------------------------------
 class NmapScanPlugin(TestingPlugin):
 
+    # Lists of supported NSE scripts.
+    # The plugin will attempt to find which ones exist in the locally
+    # installed version of Nmap, and run only those.
+
+    # Scripts that use the standard Nmap vulnerability reporting library.
+    # They produce almost identical output, so they're processed together.
+    SCRIPTS_VULN_STANDARD = (
+        "afp-path-vuln",
+        "ftp-libopie",
+        "ftp-vsftpd-backdoor",
+        "ftp-vuln-cve2010-4221",
+        "http-frontpage-login",
+        "http-iis-short-name-brute",
+        "http-method-tamper",
+        "http-slowloris-check",
+        "http-vuln-cve2006-3392",
+        "http-vuln-cve2009-3960",
+        "http-vuln-cve2010-0738",
+        "http-vuln-cve2010-2861",
+        "http-vuln-cve2011-3192",
+        "http-vuln-cve2011-3368",
+        "http-vuln-cve2012-1823",
+        "http-vuln-cve2013-0156",
+        "http-vuln-cve2013-7091",
+        "http-vuln-cve2014-2128",
+        "mysql-vuln-cve2012-2122",
+        "rdp-vuln-ms12-020",
+        "rmi-vuln-classloader",
+        "samba-vuln-cve-2012-1182",
+        "smb-vuln-ms10-061",
+        "ssl-ccs-injection",
+        "qconn-exec",
+    )
+
+    # Scripts that when successful constitute an information leak.
+    # All we do with these for now is put the output of the script
+    # in the description, but if we start extracting the information
+    # too then this "category" will cease to exist.
+    SCRIPTS_INFOLEAK = (
+        "dns-service-discovery",
+        "dns-srv-enum",
+        "dns-update",
+        "hadoop-datanode-info",
+        "hadoop-jobtracker-info",
+        "hadoop-namenode-info",
+        "hadoop-secondary-namenode-info",
+        "hadoop-tasktracker-info",
+        "http-userdir-enum",
+        "http-wordpress-enum",
+        "maxdb-info",
+        "ms-sql-dac",
+        "mysql-enum",
+        "oracle-enum-users",
+        "quake1-info",
+        "teamspeak2-version",
+        "tftp-enum",
+        "vnc-info",
+        "vuze-dht-info",
+    )
+
+    # All other scripts get treated as special cases and a callback will
+    # be used to handle each one of them.
+    SCRIPTS = (
+        "dns-blacklist",
+        "dns-random-srcport",
+        "dns-random-txid",
+        "dns-recursion",
+        "dns-zeustracker",
+        "domino-enum-users",
+        # "fcrdns",                                 # complex parsing
+        # "finger",                                 # undocumented output
+        "ftp-anon",
+        "ftp-bounce",
+        "ftp-proftpd-backdoor",
+        "http-adobe-coldfusion-apsa1301",
+        # "http-awstatstotals-exec",                # complex parsing
+        "http-coldfusion-subzero",
+        "http-drupal-enum-users",
+        "http-git",
+        # "http-google-malware",                    # requires API key
+        "http-iis-webdav-vuln",
+        "http-litespeed-sourcecode-download",
+        "http-malware-host",
+        "http-open-proxy",
+        # "http-virustotal",                        # requires API key
+        "http-vmware-path-vuln",
+        # "http-xssed",                             # complex parsing
+        "irc-unrealircd-backdoor",
+        "jdwp-info",
+        "ms-sql-empty-password",
+        "mysql-empty-password",
+        "p2p-conficker",
+        # "rdp-enum-encryption",                    # complex parsing
+        "realvnc-auth-bypass",
+        "smtp-open-relay",
+        "socks-open-proxy",
+        # "sshv1",                                  # needs a vuln class
+        # "ssl-known-key",                          # needs a vuln class
+        # "sslv2",                                  # needs the domain
+        "stuxnet-detect",
+        "x11-access",
+    )
 
     #--------------------------------------------------------------------------
     def check_params(self):
@@ -90,10 +200,38 @@ class NmapScanPlugin(TestingPlugin):
     #--------------------------------------------------------------------------
     def run(self, info):
 
+        # Get the list of supported NSE scripts.
+        # XXX FIXME this is very wrong!!! But for some reason
+        # the RPC is not giving me back the KeyError exception
+        # and just prints the traceback on the screen.
+        if self.state.check("supported_nse_scripts"):
+            supported_nse_scripts = self.state.get("supported_nse_scripts")
+        else:
+            supported_nse_scripts = []
+            for script in (
+                self.SCRIPTS +
+                self.SCRIPTS_INFOLEAK +
+                self.SCRIPTS_VULN_STANDARD
+            ):
+                code = run_external_tool(
+                    "nmap", ["--script-help=%s.nse" % script],
+                    callback=lambda x:x)
+                if code == 0:
+                    supported_nse_scripts.append(script)
+            supported_nse_scripts = tuple(supported_nse_scripts)
+            self.state.set("supported_nse_scripts", supported_nse_scripts)
+        if not supported_nse_scripts:
+            Logger.log_more_verbose(
+                "Warning: no compatible NSE scripts found!")
+
         # Build the command line arguments for Nmap.
         args = shlex.split( Config.plugin_args["args"] )
         if info.version == 6 and "-6" not in args:
             args.append("-6")
+        if supported_nse_scripts and "--script" not in args and not any(
+                x.startswith("--script=") for x in args):
+            args.append( "--script=" + ",".join(
+                x + ".nse" for x in supported_nse_scripts) )
         args.append( info.address )
 
         # The Nmap output will be saved in XML format in a temporary file.
@@ -114,10 +252,17 @@ class NmapScanPlugin(TestingPlugin):
             if code:
                 Logger.log_error(
                     "Nmap execution failed, status code: %d" % code)
-            else:
-                Logger.log(
-                    "Nmap scan finished in %s seconds for target: %s"
-                    % (t2 - t1, info.address))
+                return
+            Logger.log(
+                "Nmap scan finished in %s seconds for target: %s"
+                % (t2 - t1, info.address))
+
+            # # DEBUG
+            # with open(output, "rb") as fd1:
+            #     with open("nmap_test.xml", "wb") as fd2:
+            #         import shutil
+            #         shutil.copyfileobj(fd1, fd2)
+            # # DEBUG
 
             # Parse and return the results.
             return self.parse_nmap_results(info, output)
@@ -184,8 +329,8 @@ class NmapScanPlugin(TestingPlugin):
 
 
     #--------------------------------------------------------------------------
-    @staticmethod
-    def parse_nmap_host(host, hostmap):
+    @classmethod
+    def parse_nmap_host(cls, host, hostmap):
         """
         Convert the output of an Nmap scan to the GoLismero data model.
 
@@ -203,6 +348,12 @@ class NmapScanPlugin(TestingPlugin):
 
         # File format details can be found here:
         # https://svn.nmap.org/nmap/docs/nmap.dtd
+
+        # This is the object where we'll pin all the vulnerabilities.
+        vuln_ip = None
+
+        # This is where we'll gather all scan results.
+        results = []
 
         # Get the timestamp.
         timestamp = host.get("endtime")
@@ -224,6 +375,8 @@ class NmapScanPlugin(TestingPlugin):
             if address not in hostmap:
                 hostmap[address] = IP(address)
             ip_addresses.append( hostmap[address] )
+            if vuln_ip is None:
+                vuln_ip = hostmap[address]
 
         # Link all the IP addresses to each other.
         ips_visited = set()
@@ -292,6 +445,7 @@ class NmapScanPlugin(TestingPlugin):
                 ports.add( (state, protocol, port) )
                 if state == "open":
                     serv_node = node.find("service")
+                    service = None
                     if serv_node is not None:
                         service = serv_node.get("name")
                         if service:
@@ -303,6 +457,13 @@ class NmapScanPlugin(TestingPlugin):
                             else:
                                 protocol = protocol.upper()
                             services.add( (service, port, protocol) )
+
+                    # Parse the port script results.
+                    for script_node in node.findall(".//script"):
+                        r = cls.parse_script(
+                                script_node, vuln_ip, service, port, protocol)
+                        if r:
+                            results.extend(r)
             except Exception:
                 warn("Error parsing port scan results: %s" % format_exc(),
                      RuntimeWarning)
@@ -366,8 +527,20 @@ class NmapScanPlugin(TestingPlugin):
                 warn("Error parsing OS fingerprint results: %s" % format_exc(),
                      RuntimeWarning)
 
-        # This is where we'll gather all the results.
-        results = ip_addresses + domain_names + mac_addresses
+        # Parse the host script results.
+        if vuln_ip is not None:
+            for node in node.findall(".//hostscript"):
+                for node in node.findall(".//script"):
+                    try:
+                        r = cls.parse_script(node, vuln_ip)
+                        if r:
+                            results.extend(r)
+                    except Exception:
+                        warn("Error parsing NSE script results: %s" % \
+                             format_exc(), RuntimeWarning)
+
+        # Merge all results.
+        results = ip_addresses + domain_names + mac_addresses + results
 
         # Link the port scan results to the IP addresses.
         for ip in ip_addresses:
@@ -413,3 +586,963 @@ class NmapScanPlugin(TestingPlugin):
 
         # Return the results.
         return results
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_script(cls, node, vuln_ip,
+                     service = None, port = None, proto = None):
+        """
+        Parse the output of an NSE script.
+
+        :param node: XML node.
+        :type node: xml.etree.ElementTree.Element
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+
+        # Get the script name and output from the XML node.
+        script = node.get("id")
+        output = node.get("output")
+        assert script, node
+        assert output, node
+
+        # Fix the newlines in the output.
+        if "\r\n" in output:
+            output = output.replace("\r\n", "\n")
+
+        # Get the service, port and protocol if missing.
+        # XXX not sure if this is really needed...
+        if port is None:
+            service = script.split("-", 1)[0]
+            if proto is None:
+                port = getservbyname(service, "tcp")
+                if not port:
+                    port = getservbyname(service, "udp")
+                    proto = "UDP"
+                else:
+                    proto = "TCP"
+            else:
+                port = getservbyname(service, proto.lower())
+        elif proto is None:
+            proto = "TCP"
+        if service is None and port is not None:
+            service = getservbyport(port, proto)
+
+        # If it's a standard vulnerability script...
+        if script in cls.SCRIPTS_VULN_STANDARD:
+            # TODO extract the proper description string instead of appending
+            if "VULNERABLE:" in output:
+                vuln = VulnerableService(vuln_ip, port, proto,
+                                         **extract_vuln_ids(output))
+                vuln.description += (
+                    "\n\nNSE script '%s' output:\n%s" % (script, output)
+                )
+                return [vuln]
+
+        # If it's an infoleak script...
+        elif script in cls.SCRIPTS_INFOLEAK:
+            vuln = InformationDisclosure(vuln_ip)
+            vuln.description += (
+                "\n\nNSE script '%s' output:\n%s" % (script, output)
+            )
+            return [vuln]
+
+        # If it's any other script...
+        method = script.replace("-", "_").replace(".", "_")
+        method = "parse_" + method
+        if hasattr(cls, method):
+            r = getattr(cls, method)(output, vuln_ip, service, port, proto)
+            if r:
+                for obj in r:
+                    if obj.is_instance(Vulnerability):
+                        obj.description += (
+                            "\n\nNSE script '%s' output:\n%s" %
+                                                            (script, output)
+                        )
+                return r
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_dns_blacklist(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the dns-blacklist NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        for line in output.split("\n"):
+            if line.endswith(" - PROXY") or line.endswith(" - SPAM"):
+                return [MaliciousIP(vuln_ip)]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_dns_random_srcport(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the dns-random-srcport NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if " is GREAT: " in output:
+            return [VulnerableService(
+                vuln_ip, port, proto,
+                cve = ["CVE-2008-1447"],
+                references = [
+                    "https://www.dns-oarc.net/oarc/services/porttest"],
+                description = (
+                "A DNS server was found to have predictable source ports, "
+                "which can make a DNS server vulnerable to cache poisoning "
+                "attacks (see CVE-2008-1447)."),
+            )]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_dns_random_txid(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the dns-random-txid NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if " is GREAT: " in output:
+            return [VulnerableService(
+                vuln_ip, port, proto,
+                cve = ["CVE-2008-1447"],
+                references = [
+                    "https://www.dns-oarc.net/oarc/services/txidtest"],
+                description = (
+                "A DNS server was found to have predictable TXID values, "
+                "which can make a DNS server vulnerable to cache poisoning "
+                "attacks (see CVE-2008-1447)."),
+            )]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_dns_recursion(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the dns-recursion NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if " is GREAT: " in output:
+            return [VulnerableService(
+                vuln_ip, port, proto,
+                cve = ["CVE-2008-1447"],
+                description = (
+                "A DNS server was found to have recursion enabled, "
+                "which can make a DNS server vulnerable to cache poisoning "
+                "attacks (see CVE-2008-1447)."),
+            )]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_dns_zeustracker(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the dns-zeustracker NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return [MaliciousIP(
+            vuln_ip,
+            description = (
+            "One or more IP addresses in the same block have been found "
+            "to be part of a Zeus botnet."),
+        )]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_domino_enum_users(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the domino-enum-users NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the dumped usernames and IDs
+        return [VulnerableService(vuln_ip, port, proto,
+                                 cve = ["CVE-2006-5835"])]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_ftp_anon(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the ftp-anon NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if "Anonymous FTP login allowed" in output:
+            return [UnauthenticatedService(vuln_ip, port, proto)]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_ftp_bounce(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the ftp-bounce NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if "bounce working!" in output:
+            return [OpenProxyService(vuln_ip, port, proto)]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_ftp_proftpd_backdoor(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the ftp-proftpd-backdoor NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if "This installation has been backdoored." in output:
+            return [Backdoor(
+                vuln_ip, port, proto,
+                osvdb = ["OSBDV-69562"],
+                description = (
+                "A ProFTPD 1.3.3c server was found. This version is "
+                "backdoored, allowing any user to take control of the "
+                "server (see OSVDB ID: 69562)."),
+            )]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_http_adobe_coldfusion_apsa1301(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the http-adobe-coldfusion-apsa1301 NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if "Extracted cookie:" in output:
+            return [VulnerableService(
+                vuln_ip, port, proto,
+                cve=["CVE-2013-0631"],
+                references=["https://www.adobe.com/support/security/advisories/apsa13-01.html"])
+            ]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_http_coldfusion_subzero(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the http-coldfusion-subzero NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return [VulnerableService(
+            vuln_ip, port, proto,
+            references=["http://www.exploit-db.com/exploits/25305/"])]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_http_drupal_enum_users(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the http-drupal-enum-users NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return [VulnerableService(
+            vuln_ip, port, proto,
+            references=["http://www.madirish.net/node/465"])]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_http_git(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the http-git NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        results = []
+        for line in output.split("\n"):
+            if line.endswith(".git"):
+                url  = URL("%s://%s" % (service, line.strip()))
+                vuln = SourceCodeDisclosure(url)
+                results.append(url)
+                results.append(vuln)
+        return results
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_http_iis_webdav_vuln(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the http-iis-webdav-vuln NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if "Extracted cookie:" in output:
+            return [VulnerableService(
+                vuln_ip, port, proto,
+                ms=["MS09-020"],
+                references=[
+                    "http://blog.zoller.lu/2009/05/iis-6-webdac-auth-bypass-and-data.html",
+                    "http://seclists.org/fulldisclosure/2009/May/att-134/IIS_Advisory_pdf.bin",
+                    "http://www.skullsecurity.org/blog/?p=271",
+                    "http://www.kb.cert.org/vuls/id/787932",
+                    "http://www.microsoft.com/technet/security/advisory/971492.mspx",
+                ])]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_http_litespeed_sourcecode_download(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the http-litespeed-sourcecode-download NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if " source code:" in output:
+            return [VulnerableService(
+                vuln_ip, port, proto,
+                cve=["CVE-2010-2333"],
+                references=[
+                    "http://www.exploit-db.com/exploits/13850/",
+                ])]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_http_malware_host(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the http-malware-host NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if "Host appears to be infected" in output:
+            return [MaliciousIP(vuln_ip)]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_http_open_proxy(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the http-open-proxy NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if "Potentially OPEN proxy." in output:
+            return [OpenProxyService(vuln_ip, port, proto)]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_http_vmware_path_vuln(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the http-vmware-path-vuln NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO extract the proper description string instead of appending.
+        if ": VULNERABLE" in output:
+            return [VulnerableService(vuln_ip, port, proto,
+                                     **extract_vuln_ids(output))]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_irc_unrealircd_backdoor(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the irc-unrealircd-backdoor NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if "Looks like trojaned version of unrealircd." in output:
+            return [Backdoor(
+                vuln_ip, port, proto,
+                references = [
+                    "http://seclists.org/fulldisclosure/2010/Jun/277",
+                    "http://www.unrealircd.com/txt/unrealsecadvisory.20100612.txt",
+                    "http://www.metasploit.com/modules/exploit/unix/irc/unreal_ircd_3281_backdoor",                ],
+                description = (
+                "An backdoored UnrealIRCd server was found. This allows"
+                "any user to take control of the server."),
+            )]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_jdwp_info(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the jdwp-info NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        return [UnauthenticatedService(vuln_ip, port, proto)]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_ms_sql_empty_password(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the ms-sql-empty-password NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the usernames
+        if "Login Success" in output:
+            return [UnauthenticatedService(vuln_ip, port, proto)]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_mysql_empty_password(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the mysql-empty-password NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO get the usernames
+        if "account has empty password" in output:
+            return [UnauthenticatedService(vuln_ip, port, proto)]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_p2p_conficker(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the p2p-conficker NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if "Host is likely INFECTED" in output:
+            return [MaliciousIP(
+                vuln_ip,
+                description = (
+                    "This host appears to be infected "
+                    "with the Conficker malware."),
+            )]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_realvnc_auth_bypass(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the realvnc-auth-bypass NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if "Vulnerable" in output:
+            return [VulnerableService(
+                vuln_ip, port, proto,
+                cve=["CVE-2006-2369"],
+            )]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_smtp_open_relay(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the smtp-open-relay NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if "Server is an open relay" in output:
+            return [OpenProxyService(vuln_ip, port, proto)]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_socks_open_proxy(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the socks-open-proxy NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if "status: open" in output:
+            return [OpenProxyService(vuln_ip, port, proto)]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_stuxnet_detect(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the stuxnet-detect NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        # TODO use the proper vulnerability class here
+        if "INFECTED" in output:
+            return [MaliciousIP(
+                vuln_ip,
+                description = (
+                "This host appears to be infected with the Stuxnet malware."),
+            )]
+
+
+    #--------------------------------------------------------------------------
+    @classmethod
+    def parse_x11_access(cls, output, vuln_ip, service, port, proto):
+        """
+        Parse the output of the x11-access NSE script.
+
+        :param output: NSE script output.
+        :type output: str
+
+        :param vuln_ip: IP address to pin the vulnerabilities to.
+        :type vuln_ip: IP
+
+        :param service: Service name, or None if missing.
+        :type service: str | None
+
+        :param port: Port number, or None if missing.
+        :type port: int | None
+
+        :param proto: Protocol (TCP or UDP), or None if missing.
+        :type proto: str | None
+
+        :returns: Results from the Nmap scan for this host.
+        :rtype: list(Data)
+        """
+        if "X server access is granted" in output:
+            return [UnauthenticatedService(vuln_ip, port, proto)]
+
+
+#------------------------------------------------------------------------------
+# Make sure we're not missing any callbacks.
+for _x in NmapScanPlugin.SCRIPTS:
+    _y = "parse_%s" % _x.replace("-", "_").replace(".", "_")
+    assert hasattr(NmapScanPlugin, _y), \
+        "Missing callback: " + _y

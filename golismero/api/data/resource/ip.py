@@ -26,7 +26,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 """
 
-__all__ = ["IP"]
+__all__ = ["IP", "get_ip_address_version"]
 
 from . import Resource
 from .. import identity
@@ -34,6 +34,31 @@ from .. import Config
 from ...text.text_utils import to_utf8
 
 from netaddr import IPAddress
+
+
+#------------------------------------------------------------------------------
+def get_ip_address_version(address):
+    """
+    Determines if the given text is an IPv4 or IPv6 address.
+
+    :param address: IP address to analyze.
+    :type address: str
+
+    :return: Version number (4 or 6).
+    :rtype: int
+
+    :raises ValueError: Not an IP address.
+    """
+    try:
+        if address.startswith("[") and address.endswith("]"):
+            parsed  = IPAddress(address[1:-1], version=6)
+            address = address[1:-1]
+        else:
+            parsed  = IPAddress(address)
+        version = int( parsed.version )
+    except Exception:
+        raise ValueError("Invalid IP address: %s" % address)
+    return version
 
 
 #------------------------------------------------------------------------------
@@ -50,23 +75,14 @@ class IP(Resource):
         :type address: str
         """
 
+        # Sanitize the string.
         address = to_utf8(address)
         if not isinstance(address, str):
             raise TypeError("Expected str, got %r instead" % type(address))
 
-        try:
-            if address.startswith("[") and address.endswith("]"):
-                parsed  = IPAddress(address[1:-1], version=6)
-                address = address[1:-1]
-            else:
-                parsed  = IPAddress(address)
-            version = int( parsed.version )
-        except Exception:
-            raise ValueError("Invalid IP address: %s" % address)
-
         # IP address and protocol version.
         self.__address = address
-        self.__version = version
+        self.__version = get_ip_address_version(address)
 
         # Parent constructor.
         super(IP, self).__init__()

@@ -15,4 +15,5 @@ Class  = NmapScanPlugin
 
 # For now we'll just accept a command line verbatim.
 # In a future version we should "understand" all options instead.
+# This MUST be set as a single line of text!
 args = -vv -A -P0
