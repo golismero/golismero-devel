@@ -24,11 +24,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 import os.path
 
-from functools import partial
-from threading import Event
-from traceback import format_exc
-from warnings import warn
 from time import sleep
+from warnings import warn
+from threading import Event
+from functools import partial
+from traceback import format_exc
 
 try:
     import cPickle as Pickler
@@ -40,10 +40,11 @@ try:
 except ImportError:
     from xml.etree import ElementTree as etree
 
-from openvas_lib import VulnscanManager, VulnscanException, VulnscanVersionError, VulnscanAuditNotFoundError
+from openvas_lib import *
+from openvas_lib import report_parser
 from openvas_lib.data import OpenVASResult
 
-from golismero.api.data import vulnerability
+from golismero.api.data import vulnerability, Data
 from golismero.api.data.vulnerability import Vulnerability, \
     UncategorizedVulnerability  # noqa
 from golismero.api.logger import Logger
@@ -57,10 +58,7 @@ from golismero.api.plugin import TestingPlugin, ImportPlugin
 
 #------------------------------------------------------------------------------
 # OpenVAS plugin extra files.
-base_dir = os.path.split(os.path.abspath(__file__))[0]
-openvas_dir = os.path.join(base_dir, "openvas_plugin")
-openvas_db = os.path.join(openvas_dir, "openvas.db")
-del base_dir
+openvas_db = os.path.join(os.path.split(os.path.abspath(__file__))[0], "openvas_plugin", "openvas.db")
 
 
 #------------------------------------------------------------------------------
@@ -88,15 +86,16 @@ def load_vulnerability_types():
 
             # Load the module and extract all its data types.
             module = __import__(name, globals(), locals(), ['*'])
-            for name in dir(module):
-                if name.startswith("_") or name == "Vulnerability":
+            for module_name in dir(module):
+                if module_name.startswith("_") or module_name == "Vulnerability":
                     continue
-                clazz = getattr(module, name)
+                clazz = getattr(module, module_name)
+                if "php" in clazz.__class__.__name__:
+                    print clazz
                 if isinstance(clazz, type) and \
-                        issubclass(clazz, Vulnerability) and \
-                                clazz not in data_types:
+                        issubclass(clazz, Vulnerability) and clazz not in data_types:
                     data_types.append(clazz)
-                    globals()[name] = clazz
+                    globals()[module_name] = clazz
 
     return data_types
 
@@ -118,25 +117,29 @@ class OpenVASProgress(object):
 
 #------------------------------------------------------------------------------
 class OpenVASPlugin(TestingPlugin):
-
+    # ----------------------------------------------------------------------
+    def __get_config(self):
+        """Get user config"""
+        return (Config.plugin_args["user"],
+                Config.plugin_args["password"],
+                Config.plugin_args["host"],
+                Config.plugin_args["port"],
+                Config.plugin_args["timeout"],
+                Config.plugin_args["profile"])
 
     #--------------------------------------------------------------------------
     def check_params(self):
 
         # Check the parameters.
         try:
-            m_user = Config.plugin_args["user"]
-            m_password = Config.plugin_args["password"]
-            m_host = Config.plugin_args["host"]
-            m_port = int(Config.plugin_args["port"])
-            m_timeout = Config.plugin_args["timeout"]
-            m_profile = Config.plugin_args["profile"]
+
+            m_user, m_password, m_host, m_port, m_timeout, m_profile = self.__get_config()
 
             assert m_user,     "Missing username"
             assert m_password, "Missing password"
             assert m_host,     "Missing hostname"
             assert m_profile,  "Missing scan profile"
-            assert 0 < m_port < 65536, "Missing or wrong port number"
+            assert 0 < int(m_port) < 65536, "Missing or wrong port number"
             if m_timeout.lower().strip() in ("inf", "infinite", "none"):
                 m_timeout = None
             else:
@@ -160,11 +163,9 @@ class OpenVASPlugin(TestingPlugin):
         if not os.path.exists(openvas_db):
             warn("OpenVAS plugin not initialized, please run setup.py")
 
-
     #--------------------------------------------------------------------------
     def get_accepted_types(self):
         return [IP]
-
 
     #--------------------------------------------------------------------------
     def run(self, info):
@@ -176,32 +177,27 @@ class OpenVASPlugin(TestingPlugin):
             m_event = Event()
 
             # Get the config.
-            m_user = Config.plugin_args["user"]
-            m_password = Config.plugin_args["password"]
-            m_host = Config.plugin_args["host"]
-            m_port = Config.plugin_args["port"]
-            m_timeout = Config.plugin_args["timeout"]
-            m_profile = Config.plugin_args["profile"]
+            m_user, m_password, m_host, m_port, m_timeout, m_profile = self.__get_config()
 
             # Sanitize the port and timeout.
             try:
                 m_port = int(m_port)
-            except Exception:
+            except TypeError:
                 m_port = 9390
             if m_timeout.lower().strip() in ("inf", "infinite", "none"):
                 m_timeout = None
             else:
                 try:
                     m_timeout = int(m_timeout)
-                except Exception:
+                except TypeError:
                     m_timeout = None
 
             # Connect to the scanner.
             try:
                 Logger.log_more_verbose(
                     "Connecting to OpenVAS server at %s:%d" % (m_host, m_port))
-                m_scanner = VulnscanManager(
-                    m_host, m_user, m_password, m_port, m_timeout)
+
+                m_scanner = VulnscanManager(m_host, m_user, m_password, m_port, m_timeout)
 
             except VulnscanVersionError:
                 Logger.log_error(
@@ -223,6 +219,7 @@ class OpenVASPlugin(TestingPlugin):
 
             m_scan_id = None
             m_target_id = None
+            m_openvas_results = None
             try:
                 # Launch the scanner.
                 m_scan_id, m_target_id = m_scanner.launch_scan(
@@ -248,7 +245,7 @@ class OpenVASPlugin(TestingPlugin):
 
             finally:
 
-                # Clean up.
+                # Clean up:
                 if m_scan_id:
                     # Stop the scan
                     for i in xrange(3):
@@ -264,9 +261,10 @@ class OpenVASPlugin(TestingPlugin):
                         except Exception, e:
                             sleep(0.1)
                             Logger.log_error_more_verbose(
-                                "Error while stopping scan ID: %s. "
-                                "Attempt %s. Error: %s" %
-                                (str(m_scan_id), str(i)), e.message)
+                                "Error while stopping scan ID: %s. Attempt %s. Error: %s" % (
+                                    str(m_scan_id),
+                                    str(i),
+                                    e.message))
                             continue
 
                     # Delete the scan
@@ -281,9 +279,10 @@ class OpenVASPlugin(TestingPlugin):
                         except Exception, e:
                             sleep(0.1)
                             Logger.log_error_more_verbose(
-                                "Error while deleting scan ID: %s. "
-                                "Attempt %s. Error: %s" %
-                                (str(m_scan_id), str(i)), e.message)
+                                "Error while deleting scan ID: %s. Attempt %s. Error: %s" % (
+                                    str(m_scan_id),
+                                    str(i),
+                                    e.message))
                             continue
 
                 if m_target_id:
@@ -299,13 +298,17 @@ class OpenVASPlugin(TestingPlugin):
                         except Exception, e:
                             sleep(0.1)
                             Logger.log_error_more_verbose(
-                                "Error while deleting target ID: %s. "
-                                "Attempt %s. Error: %s" %
-                                (str(m_target_id), str(i)), e.message)
+                                "Error while deleting target ID: %s. Attempt %s. Error: %s" % (
+                                    str(m_target_id),
+                                    str(i),
+                                    e.message))
                             continue
 
         # Convert the scan results to the GoLismero data model.
-        return self.parse_results(m_openvas_results, info)
+        if m_openvas_results is None:
+            return
+        else:
+            return self.parse_results(m_openvas_results, info)
 
 
     #--------------------------------------------------------------------------
@@ -323,6 +326,12 @@ class OpenVASPlugin(TestingPlugin):
         :returns: Scan results converted to the GoLismero data model.
         :rtype: list(Data)
         """
+        if not isinstance(openvas_results, list):
+            raise TypeError("Expected list, got '%s' instead" % type(openvas_results))
+        else:
+            for x in openvas_results:
+                if not isinstance(x, OpenVASResult):
+                    raise TypeError("Expected OpenVASResult, got '%s' instead" % type(x))
 
         # This is where we'll store the results.
         results = []
@@ -331,14 +340,14 @@ class OpenVASPlugin(TestingPlugin):
         hosts_seen = {}
 
         # Maps of OpenVAS levels to GoLismero levels.
-        LEVELS = {
+        levels = {
             'debug': 'informational',
             'log': 'informational',
             'low': "low",
             'medium': 'middle',
             'high': "high",
         }
-        RISKS = {
+        risks = {
             'none': 0,
             'debug': 0,
             'log': 0,
@@ -366,13 +375,16 @@ class OpenVASPlugin(TestingPlugin):
 
         # For each OpenVAS result...
         for opv in openvas_results:
+            if not isinstance(opv, OpenVASResult):
+                raise TypeError("Expected OpenVASResult, got '%s' instead" % type(opv))
+
             try:
 
                 # Get the host.
                 host = opv.host
 
                 # Skip if we don't have a target host.
-                if host is None:
+                if not host:
                     continue
 
                 # Get the threat level.
@@ -394,83 +406,98 @@ class OpenVASPlugin(TestingPlugin):
                     except ValueError:
                         target = Domain(host)
                     hosts_seen[host] = target
+
+                    # TODO: ADD the port!!
+                    if opv.port.number:
+                        pass
+
                     results.append(target)
 
-                # Get the vulnerability description.
-                description = opv.description
-                if not description:
-                    description = nvt.description
-                    if not description:
-                        description = nvt.summary
-                        if not description:
-                            description = None
+                # --------------------------------------------------------------------------
+                # Vulnerability info
+                # --------------------------------------------------------------------------
+                if opv.summary:
+                    description = opv.summary
+                else:
+                    description = opv.raw_description
+                description = "%s\n\nImpact:\n\n%s" % (description, opv.impact) if opv.impact else description
 
-                # Extract the relevant information from the results.
-                nvt       = opv.nvt
-                vid       = opv.id
-                oid       = int(nvt.oid.split(".")[-1])
-                name      = getattr(nvt, "name", None)
-                cvss_base = getattr(nvt, "cvss_base", None)
-                level     = LEVELS.get(threat, "informational")
-                risk      = RISKS.get(
-                    getattr(opv.nvt, "risk_factor", "none").lower(), 0)
+                # ID
+                vid = opv.id
 
-                # Extract the CVEs and Bugtraq IDs.
-                cve = nvt.cve.split(", ") if nvt.cve else []
-                if "NOCVE" in cve:
-                    cve.remove("NOCVE")
-                bid = []
-                if nvt.bid:
-                    bid.extend("BID-" + x for x in nvt.bid.split(", "))
-                if nvt.bugtraq:
-                    bid.extend("BID-" + x for x in nvt.bugtraq.split(", "))
-                if "NOBID" in bid:
-                    cve.remove("NOBID")
+                # OID
+                nvt = opv.nvt
+                oid = int(nvt.oid.split(".")[-1])
 
+                # Vulnerability name
+                name = nvt.name
+
+                # CVSS
+                cvss_base = nvt.cvss_base
+                cvss_base_vector = nvt.cvss_base_vector
+
+                # Risk, level and impact
+                level = levels.get(threat.lower(), "informational")
+                risk = risks.get(getattr(opv.nvt, "risk_factor", "none").lower(), 0)
+
+                # CVE, BID and Bugtraq IDs
+                cve = opv.nvt.cve
+                bid = ["BID-%s" % bidl for bidl in opv.nvt.bid]
+
+                # Others
+                solution = opv.solution
+
+                # TODO: currently, openvas_lib doesn't support notes
                 # Extract the notes and add them to the description text.
-                if opv.notes and description is not None:
-                    description += "\n" + "\n".join(
-                        " - " + note.text
-                        for note in opv.notes
-                    )
+                # if opv.notes and description is not None:
+                #     description += "\n" + "\n".join(
+                #         " - " + note.text
+                #         for note in opv.notes
+                #     )
 
+                # --------------------------------------------------------------------------
                 # Extract the reference URLs from the description text.
+                #--------------------------------------------------------------------------
                 references = []
-                if description is not None:
-                    p = description.find("URL:")
+                if opv.raw_description is not None:
+                    p = opv.raw_description.find("URL:")
                     while p >= 0:
                         p += 4
-                        q2 = description.find("\n", p)
-                        q1 = description.find(",", p, q2)
+                        q2 = opv.raw_description.find("\n", p)
+                        q1 = opv.raw_description.find(",", p, q2)
                         if q1 > p:
                             q = q1
                         else:
                             q = q2
                         if q < p:
-                            q = len(description)
-                        url = description[p:q].strip()
+                            q = len(opv.raw_description)
+                        url = opv.raw_description[p:q].strip()
                         try:
                             url = parse_url(url).url
                             references.append(url)
                         except Exception:
                             Logger.log_error(format_exc())
                             pass
-                        p = description.find("URL:", q)
+                        p = opv.raw_description.find("URL:", q)
 
+                # --------------------------------------------------------------------------
                 # Prepare the vulnerability properties.
+                # --------------------------------------------------------------------------
                 kwargs = {
-                    "title":        name,
-                    "description":  description,
-                    "references":   references,
-                    "level":        level,
-                    "risk":         risk,
-                    "severity":     risk,
-                    "impact":       risk,
-                    "cvss_base":    cvss_base,
-                    "cve":          cve,
-                    "bid":          bid,
-                    "tool_id":      "openvas_plugin_%s" % oid,
-                    "custom_id":    vid,
+                    "title": name,
+                    "description": description,
+                    "references": references,
+                    "level": level,
+                    "risk": risk,
+                    "severity": risk,
+                    "impact": risk,
+                    "solution": solution,
+                    "cvss_base": cvss_base,
+                    "cvss_vector": cvss_base_vector,
+                    "cve": cve,
+                    "bid": bid,
+                    "tool_id": "openvas_plugin_%s" % oid,
+                    "custom_id": vid,
                 }
 
                 # If we have the OpenVAS plugin database, look up the plugin ID
@@ -484,7 +511,34 @@ class OpenVASPlugin(TestingPlugin):
                 # Create the Vulnerability object.
                 try:
                     clazz = globals()[classname]
-                    vuln  = clazz(target, **kwargs)
+
+                    if getattr(clazz, "__name__", "").endswith("UncategorizedVulnerability"):
+                    #
+                    #     # To avoid to generate a lot of "Uncategorized vulnerabilites", try to create new vuln on the
+                    #     # fly
+                    #
+                    #   # TODO: This doesn't Works!!
+                    #     class A(Vulnerability):
+                    #         DEFAULTS = Vulnerability.DEFAULTS.copy()
+                    #         data_subtype = "vulnerability/unknown"
+                    #
+                    #         def __init__(self, target, **kwargs):
+                    #             super(A, self).__init__(target, **kwargs)
+                    #
+                    #         #--------------------------------------------------------------------------
+                    #         @property
+                    #         def display_name(self):
+                    #             return "Outdated Platform: Mandriva"
+                    #
+                    #     clazz = A
+                    #
+                    #     # TODO: This doesn't Works!!
+                    #     new_class_name = "golismero.api.data.vulnerability.%s" % name.replace(" ", "_").capitalize()
+                    #
+                    #     clazz = type(new_class_name, (Vulnerability,), dict(data_type=Data.TYPE_VULNERABILITY,
+                    #                                                         data_subtype="vulnerability/generic"))
+
+                    vuln = clazz(target, **kwargs)
                 except Exception, e:
                     t = format_exc()
                     Logger.log_error_more_verbose(
@@ -500,13 +554,12 @@ class OpenVASPlugin(TestingPlugin):
                     "Error parsing OpenVAS results: %s" % str(e))
                 Logger.log_error_more_verbose(t)
 
-        # Return the converted results.
+        # Return the converted results
         return results
 
 
 #------------------------------------------------------------------------------
 class OpenVASImportPlugin(ImportPlugin):
-
 
     #--------------------------------------------------------------------------
     def is_supported(self, input_file):
@@ -520,13 +573,10 @@ class OpenVASImportPlugin(ImportPlugin):
                 return True
         return False
 
-
     #--------------------------------------------------------------------------
     def import_results(self, input_file):
         try:
-            xml_results = etree.parse(input_file)
-            xml_root = xml_results.getroot()
-            openvas_results = VulnscanManager.transform(xml_root)
+            openvas_results = report_parser(input_file)
             golismero_results = OpenVASPlugin.parse_results(openvas_results)
             if golismero_results:
                 Database.async_add_many(golismero_results)
@@ -541,7 +591,8 @@ class OpenVASImportPlugin(ImportPlugin):
                 data_count = len(golismero_results)
                 vuln_count = sum(
                     1 for x in golismero_results
-                    if x.is_instance(Vulnerability)
+                    if isinstance(x, Vulnerability)  # Change because internal method don't recognize father vulns
+                    # if x.is_instance(Vulnerability)  # Change because internal method don't recognize father vulns
                 )
                 if vuln_count == 0:
                     vuln_msg = ""
