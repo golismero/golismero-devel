@@ -513,6 +513,7 @@ class OpenVASPlugin(TestingPlugin):
                     clazz = globals()[classname]
 
                     if getattr(clazz, "__name__", "").endswith("UncategorizedVulnerability"):
+                        pass
                     #
                     #     # To avoid to generate a lot of "Uncategorized vulnerabilites", try to create new vuln on the
                     #     # fly
